@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JadeView Go 封装 Demo</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+    margin: 0; padding: 24px;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    color: #e2e8f0; min-height: 100vh;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; color: #94a3b8; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  button {
+    padding: 12px; border: 1px solid #334155; border-radius: 10px;
+    background: #1e293b; color: #e2e8f0; font-size: 13px; cursor: pointer;
+    transition: .15s;
+  }
+  button:hover { background: #334155; border-color: #475569; transform: translateY(-1px); }
+  h2 { font-size: 13px; color: #64748b; margin: 22px 0 8px; text-transform: uppercase; letter-spacing: .05em; }
+  #log {
+    margin-top: 20px; background: #0b1220; border: 1px solid #1e293b; border-radius: 10px;
+    padding: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    height: 200px; overflow-y: auto; white-space: pre-wrap; color: #7dd3fc;
+  }
+</style>
+</head>
+<body>
+  <h1>JadeView × Go(cgo) 封装 Demo</h1>
+  <p class="sub">点按钮 → 前端 jade.invoke → Go 原生处理 → 结果回传。打开 DevTools 看通信细节。</p>
+
+  <h2>对话框（异步，验证回调桥）</h2>
+  <div class="grid">
+    <button onclick="call('open-file')">打开文件对话框</button>
+    <button onclick="call('save-file')">保存文件对话框</button>
+    <button onclick="call('msgbox')">消息框</button>
+    <button onclick="call('notify')">系统通知</button>
+  </div>
+
+  <h2>YAML 存储</h2>
+  <div class="grid">
+    <button onclick="call('yaml-set')">写入 YAML</button>
+    <button onclick="call('yaml-get')">读取 YAML</button>
+    <button onclick="call('yaml-all')">读取全部</button>
+  </div>
+
+  <h2>窗口 / 系统</h2>
+  <div class="grid">
+    <button onclick="call('toggle-top')">切换置顶</button>
+    <button onclick="call('minimize')">最小化</button>
+    <button onclick="call('devtools')">开/关 DevTools</button>
+    <button onclick="call('displays')">显示器信息</button>
+    <button onclick="call('webview-ver')">WebView 版本</button>
+  </div>
+
+  <div id="log"></div>
+
+<script>
+  const logEl = document.getElementById('log');
+  function log(msg) {
+    const t = new Date().toLocaleTimeString();
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // 前端 → 原生：jade.invoke(channel) 调用 Go 的 RegisterIPCHandler 处理器
+  async function call(channel) {
+    try {
+      const res = await jade.invoke(channel, {}, { timeout: 5000 });
+      log(`invoke('${channel}') → ${res}`);
+    } catch (e) {
+      log(`invoke('${channel}') 出错: ${e}`);
+    }
+  }
+
+  // 原生 → 前端：Go 的 SendIPCMessage 推送，异步对话框结果走这里
+  if (window.jade && jade.on) {
+    jade.on('dialog-result', (payload) => {
+      log(`← 原生推送 dialog-result: ${JSON.stringify(payload)}`);
+    });
+  }
+
+  log('页面已加载，jade 对象 ' + (window.jade ? '可用' : '不可用'));
+</script>
+</body>
+</html>

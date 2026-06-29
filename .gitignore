@@ -1,0 +1,20 @@
+# 构建产物
+*.exe
+*.exe~
+*.test
+*.out
+/demo
+/dist/
+/build/
+
+# 临时/释放产物
+*.log
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# 注意：lib/ 下的 .dll / .a / .so 是构建必需，不忽略（需随仓库提交，否则无法编译）
