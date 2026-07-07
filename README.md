@@ -1,6 +1,6 @@
 # JadeView Go 封装
 
-[JadeView](https://jadeview.com) WebView 桌面库的 Go 封装。用 Go + HTML/CSS/JS 写跨平台桌面应用：窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时等一应俱全。
+[JadeView](https://jade.run) WebView 桌面库的 Go 封装。用 Go + HTML/CSS/JS 写跨平台桌面应用：窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时等一应俱全。
 
 当前对应上游 **v2.3.0-beta.10**，头文件 124 个导出函数已全部封装。
 
