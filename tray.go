@@ -1,3 +1,5 @@
+//go:build linux
+
 package jadeview
 
 /*
@@ -7,24 +9,6 @@ package jadeview
 import "C"
 
 import "unsafe"
-
-// 托盘菜单项类型（TrayMenuItemDesc.item_type）。
-const (
-	TrayItemNormal  = 0 // 普通项
-	TrayItemSubmenu = 1 // 子菜单
-	TrayItemDivider = 2 // 分隔线
-	TrayItemGroup   = 3 // 分组
-)
-
-// TrayMenuItem 对应 C 的 TrayMenuItemDesc（扁平表，用 ParentKey 指向父项的 Key）。
-type TrayMenuItem struct {
-	Type      int    // 见 TrayItem* 常量
-	Key       string // 全表唯一、非空（分隔线也需唯一 key）
-	Label     string
-	ParentKey string // 空=根下子项；否则须等于某行的 Key 且该行为 Submenu/Group
-	Disabled  bool
-	Dangerous bool
-}
 
 // TrayCreate 创建托盘图标，返回 tray_id（0=失败）。
 func TrayCreate() uint32 {

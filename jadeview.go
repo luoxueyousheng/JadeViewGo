@@ -1,11 +1,7 @@
-// Package jadeview 是 JadeView WebView 库的 Go(cgo)封装。
-//
-// 本文件封装生命周期函数（初始化、版本号、消息循环、退出）。
-// 其余 API 按模块拆分：窗口(window*.go)、事件(events.go)、对话框(dialog*.go)、
-// 托盘(tray.go)、YAML(yaml.go)、系统工具(system.go)、JAPK(japk.go)。
-//
-// 链接方式：Linux 静态链接 libJadeView.a（jadeview_linux_*.go）；
-// Windows 延迟链接 MSVC DLL + go:embed 自包含（jadeview_windows_*.go）。
+//go:build linux
+
+// Linux(cgo) 实现：生命周期函数（初始化、版本号、消息循环、退出）。
+// 静态链接 libJadeView.a，链接参数见 jadeview_linux_*.go。
 package jadeview
 
 /*
@@ -75,14 +71,4 @@ func RunMessageLoop() {
 // Exit 清理所有窗口并结束消息循环。
 func Exit() {
 	C.jadeview_exit()
-}
-
-// cBufToString 把以 NUL 结尾的 C 缓冲区转成 Go string。
-func cBufToString(buf []byte) string {
-	for i, b := range buf {
-		if b == 0 {
-			return string(buf[:i])
-		}
-	}
-	return string(buf)
 }

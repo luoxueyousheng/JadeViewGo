@@ -1,3 +1,5 @@
+//go:build linux
+
 package jadeview
 
 // 异步对话框回调桥：异步对话框完成后通过 void(const char*) 回调回传结果 JSON。
@@ -31,12 +33,6 @@ static JvDlgCb jv_dlg_get_tramp(int i){ return jv_dlg_tramps[i]; }
 import "C"
 
 import "sync"
-
-// DialogResultHandler 异步对话框结果回调，result 为结果 JSON（取消时通常为空/null）。
-type DialogResultHandler func(result string)
-
-// MaxAsyncDialogs 同时在途的异步对话框上限（C 跳板槽位数）。
-const MaxAsyncDialogs = 16
 
 var (
 	dlgMu    sync.Mutex

@@ -1,3 +1,5 @@
+//go:build linux
+
 package jadeview
 
 /*
@@ -37,70 +39,6 @@ func b2i(b bool) C.int32_t {
 		return 1
 	}
 	return 0
-}
-
-// WindowOptions 对应 C 的 WebViewWindowOptions。
-type WindowOptions struct {
-	Title             string
-	Width             int
-	Height            int
-	Resizable         bool
-	FrameStyle        string // normal / no-titlebar / borderless
-	Transparent       bool
-	BackgroundColor   string // "#RRGGBBAA"
-	AlwaysOnTop       bool
-	Theme             string
-	Maximized         bool
-	Maximizable       bool
-	Minimizable       bool
-	X                 int // -1 = 居中
-	Y                 int // -1 = 居中
-	MinWidth          int
-	MinHeight         int
-	MaxWidth          int
-	MaxHeight         int
-	Fullscreen        bool
-	Focus             bool
-	HideWindow        bool
-	UsePageIcon       bool
-	ContentProtection bool
-	AutoSaveState     bool
-	SkipTaskbar       bool
-	NoActivate        bool
-}
-
-// DefaultWindowOptions 返回一组常用默认值。
-func DefaultWindowOptions() WindowOptions {
-	return WindowOptions{
-		Title:       "JadeView",
-		Width:       1024,
-		Height:      768,
-		Resizable:   true,
-		FrameStyle:  "normal",
-		Maximizable: true,
-		Minimizable: true,
-		X:           -1,
-		Y:           -1,
-		Focus:       true,
-	}
-}
-
-// WebViewSettings 对应 C 的 WebViewSettings。
-type WebViewSettings struct {
-	Autoplay               bool
-	BackgroundThrottling   bool
-	AllowRightClick        bool
-	UserAgent              string
-	PreloadJS              string
-	AllowFullscreen        bool
-	PostMessageWhitelist   string
-	CORSWhitelist          string
-	Autofill               bool
-	GeneralAutofillEnabled bool
-	Incognito              bool
-	DisableClipboard       bool
-	ProxyURL               string
-	Focused                bool
 }
 
 func (o *WindowOptions) toC(pool *cstrPool) C.WebViewWindowOptions {

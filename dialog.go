@@ -1,3 +1,5 @@
+//go:build linux
+
 package jadeview
 
 /*
@@ -7,18 +9,6 @@ package jadeview
 import "C"
 
 // --- 通知 ---
-
-// NotificationParams 对应 C 的 NotificationParams。
-type NotificationParams struct {
-	Summary string // 标题/摘要
-	Body    string // 正文
-	Icon    string // 图标路径
-	Timeout int    // 毫秒，-1=系统默认
-	Button1 string
-	Button2 string
-	Text3   string // 按钮3文本
-	Action  string // 默认操作动作
-}
 
 // ShowNotification 显示系统通知。
 func ShowNotification(p NotificationParams) bool {
@@ -38,16 +28,6 @@ func ShowNotification(p NotificationParams) bool {
 }
 
 // --- 文件对话框 ---
-
-// FileDialogParams 对应 C 的 FileDialogParams。
-type FileDialogParams struct {
-	WindowID    uint32
-	Title       string
-	DefaultPath string
-	ButtonLabel string
-	Filters     string // JSON 格式过滤器
-	Properties  string // JSON 格式属性
-}
 
 func (p *FileDialogParams) toC(pool *cstrPool) C.FileDialogParams {
 	return C.FileDialogParams{
@@ -78,18 +58,6 @@ func ShowSaveDialog(p FileDialogParams) string {
 
 // --- 消息框 ---
 
-// MessageBoxParams 对应 C 的 MessageBoxParams。
-type MessageBoxParams struct {
-	WindowID  uint32
-	Title     string
-	Message   string
-	Detail    string
-	Buttons   string // JSON 数组
-	DefaultID int
-	CancelID  int
-	Type      string // none / info / warning / error
-}
-
 // ShowMessageBox 显示消息框，返回结果 JSON（含点击的按钮索引）。
 func ShowMessageBox(p MessageBoxParams) string {
 	pool := &cstrPool{}
@@ -115,15 +83,6 @@ func ShowErrorBox(windowID uint32, title, content string) bool {
 }
 
 // --- 右键/上下文菜单项 ---
-
-// 菜单项类型（jade_menu_item_create 的 kind 参数）。
-const (
-	MenuKindNormal    = 0 // 普通命令
-	MenuKindSeparator = 1 // 分隔线
-	MenuKindCheckbox  = 2 // 复选框
-	MenuKindRadio     = 3 // 单选
-	MenuKindSubmenu   = 4 // 子菜单
-)
 
 // MenuItemCreate 创建菜单项，返回 menu_id（0=失败）。
 //   - kind: 见 MenuKind* 常量

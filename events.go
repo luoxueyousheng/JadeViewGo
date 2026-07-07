@@ -1,3 +1,5 @@
+//go:build linux
+
 package jadeview
 
 // 事件回调桥接：库的 IpcCallback 签名为 (window_id, data)，不携带事件名，
@@ -84,12 +86,6 @@ import (
 	"sync"
 	"unsafe"
 )
-
-// EventHandler 是事件处理函数。返回非空字符串会作为响应回传给库（多数事件可返回 ""）。
-type EventHandler func(windowID uint32, data string) string
-
-// MaxEventHandlers 是可同时注册的事件处理器上限（C 跳板槽位数）。
-const MaxEventHandlers = 64
 
 type eventReg struct {
 	event   string

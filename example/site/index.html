@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JadeView Go Demo</title>
+<link rel="stylesheet" href="fluent.css">
+</head>
+<body>
+<!-- SVG 图标库（Fluent 风格线性图标，16px / 1.5px 描边 / currentColor，§5 禁用 Emoji） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-logo"><path d="M3 6 L8 2 L13 6 L8 14 Z M3 6 H13 M8 14 L5.5 6 M8 14 L10.5 6"/></g>
+    <g id="i-menu"><path d="M2.5 4 H13.5 M2.5 8 H13.5 M2.5 12 H13.5"/></g>
+    <g id="i-home"><path d="M2 8 L8 2 L14 8 M4 7 V13 H12 V7"/></g>
+    <g id="i-brush"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5 V3 M8 13 V14.5 M1.5 8 H3 M13 8 H14.5 M3.4 3.4 L4.5 4.5 M11.5 11.5 L12.6 12.6 M12.6 3.4 L11.5 4.5 M4.5 11.5 L3.4 12.6"/></g>
+    <g id="i-ipc"><path d="M2 5 H11 M8.5 2.5 L11 5 L8.5 7.5 M14 11 H5 M7.5 8.5 L5 11 L7.5 13.5"/></g>
+    <g id="i-window"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6 H14"/></g>
+    <g id="i-chip"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/><path d="M6.5 4.5 V2 M9.5 4.5 V2 M6.5 14 V11.5 M9.5 14 V11.5 M4.5 6.5 H2 M4.5 9.5 H2 M14 6.5 H11.5 M14 9.5 H11.5"/></g>
+    <g id="i-db"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5 V12.5 C2.5 13.6 5 14.5 8 14.5 C11 14.5 13.5 13.6 13.5 12.5 V3.5 M2.5 8 C2.5 9.1 5 10 8 10 C11 10 13.5 9.1 13.5 8"/></g>
+    <g id="i-close"><path d="M4 4 L12 12 M12 4 L4 12"/></g>
+    <g id="i-info"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.5 V11 M8 5.2 V5.4"/></g>
+    <g id="i-check"><circle cx="8" cy="8" r="6.25"/><path d="M5 8.2 L7.2 10.4 L11 6"/></g>
+    <g id="i-warn"><path d="M8 2.5 L14.5 13.5 H1.5 Z M8 7 V10 M8 11.8 V12"/></g>
+    <g id="i-error"><circle cx="8" cy="8" r="6.25"/><path d="M5.6 5.6 L10.4 10.4 M10.4 5.6 L5.6 10.4"/></g>
+  </defs>
+</svg>
+
+<div id="app">
+  <!-- 标题栏：内容自绘，右上角 146px 留给库内置的 最小化/最大化/关闭 -->
+  <header class="title-bar">
+    <svg class="icon logo" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><use href="#i-logo"/></svg>
+    <span class="app-name">JadeView Go Demo</span>
+    <span class="app-sub" id="titleSub">Fluent Design · 纯 Go 绑定</span>
+  </header>
+
+  <div class="main">
+    <!-- NavigationView -->
+    <nav class="nav" id="nav" role="tablist" aria-orientation="vertical">
+      <div class="nav-indicator" id="navInd"></div>
+      <button class="nav-item nav-hamburger" id="hamburger" title="展开/收缩导航" aria-label="展开或收缩导航">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-menu"/></svg>
+        <span class="label">导航</span>
+      </button>
+      <button class="nav-item active" data-page="overview" role="tab" aria-selected="true" title="概览">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><use href="#i-home"/></svg>
+        <span class="label">概览</span>
+      </button>
+      <button class="nav-item" data-page="appearance" role="tab" aria-selected="false" title="外观">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-brush"/></svg>
+        <span class="label">外观</span>
+      </button>
+      <button class="nav-item" data-page="ipc" role="tab" aria-selected="false" title="IPC 测试">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-ipc"/></svg>
+        <span class="label">IPC 测试</span>
+      </button>
+      <button class="nav-item" data-page="window" role="tab" aria-selected="false" title="窗口">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#i-window"/></svg>
+        <span class="label">窗口</span>
+      </button>
+      <button class="nav-item" data-page="system" role="tab" aria-selected="false" title="系统">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-chip"/></svg>
+        <span class="label">系统</span>
+      </button>
+      <div class="nav-spacer"></div>
+      <button class="nav-item" data-page="storage" role="tab" aria-selected="false" title="存储">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#i-db"/></svg>
+        <span class="label">存储</span>
+      </button>
+    </nav>
+
+    <!-- 内容区 -->
+    <main class="content" id="content">
+
+      <!-- 概览 -->
+      <section class="page active stagger" id="page-overview">
+        <h1>概览</h1>
+        <p class="lead">JadeView Go(纯 Go 绑定) × Fluent Design 2 演示。左侧导航切换功能页。</p>
+        <div class="card">
+          <p class="card-title">运行环境</p>
+          <dl class="kv" id="sysinfoKv"><dt>状态</dt><dd>加载中…</dd></dl>
+        </div>
+        <div class="card">
+          <p class="card-title">这个窗口</p>
+          <p style="margin:0;color:var(--text-2)">
+            <code>title-overlay</code> 边框样式（右上角控制按钮由库内置渲染）+
+            <code>Mica</code> 材质 + 透明窗口。标题栏为页面自绘的拖拽区，
+            主题与材质可在「外观」页实时切换。
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-title">显示器</p>
+          <dl class="kv" id="displayKv"><dt>状态</dt><dd>加载中…</dd></dl>
+        </div>
+      </section>
+
+      <!-- 外观 -->
+      <section class="page" id="page-appearance">
+        <h1>外观</h1>
+        <p class="lead">颜色模式、窗口材质与缩放，全部实时生效。</p>
+
+        <div class="card">
+          <p class="card-title">颜色模式</p>
+          <div class="seg" id="segTheme" role="tablist" aria-label="颜色模式">
+            <div class="seg-ind"></div>
+            <button role="tab" data-v="light">浅色</button>
+            <button role="tab" data-v="dark">深色</button>
+            <button role="tab" data-v="system" aria-selected="true">跟随系统</button>
+          </div>
+          <p class="hint">调用 set_window_theme 切换窗口主题；标题栏控制按钮图标色经 set_titlebar_overlay_style 同步。</p>
+        </div>
+
+        <div class="card">
+          <p class="card-title">窗口材质（Backdrop）</p>
+          <div class="mat-grid" id="matList" role="radiogroup" aria-label="窗口材质">
+            <button class="mat" data-v="mica" aria-pressed="true">
+              <span class="swatch sw-mica" aria-hidden="true"></span>
+              <span class="mat-text"><b>Mica</b><span>云母：从壁纸取色，窗口主背景（推荐）</span></span>
+              <span class="radio" aria-hidden="true"></span>
+            </button>
+            <button class="mat" data-v="micaAlt" aria-pressed="false">
+              <span class="swatch sw-micaAlt" aria-hidden="true"></span>
+              <span class="mat-text"><b>Mica Alt</b><span>云母变体：色调更深，适合侧边栏/分区</span></span>
+              <span class="radio" aria-hidden="true"></span>
+            </button>
+            <button class="mat" data-v="acrylic" aria-pressed="false">
+              <span class="swatch sw-acrylic" aria-hidden="true"></span>
+              <span class="mat-text"><b>Acrylic</b><span>亚克力：实时高斯模糊，通透感最强</span></span>
+              <span class="radio" aria-hidden="true"></span>
+            </button>
+            <button class="mat" data-v="none" aria-pressed="false">
+              <span class="swatch sw-none" aria-hidden="true"></span>
+              <span class="mat-text"><b>纯色</b><span>实色底：最低开销，随明暗主题换色</span></span>
+              <span class="radio" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p class="hint">材质走 set_window_backdrop（Windows 11 DWM）；纯色走 set_window_background_color。</p>
+        </div>
+
+        <div class="card">
+          <p class="card-title">页面缩放</p>
+          <div class="seg" id="segZoom" role="tablist" aria-label="页面缩放">
+            <div class="seg-ind"></div>
+            <button role="tab" data-v="0.8">80%</button>
+            <button role="tab" data-v="1" aria-selected="true">100%</button>
+            <button role="tab" data-v="1.25">125%</button>
+            <button role="tab" data-v="1.5">150%</button>
+          </div>
+          <p class="hint">调用 set_webview_zoom（不硬改字号）。</p>
+        </div>
+      </section>
+
+      <!-- IPC 测试 -->
+      <section class="page" id="page-ipc">
+        <h1>IPC 测试</h1>
+        <p class="lead">前端 jade.invoke ⇄ Go RegisterIPCHandler 双向通信测试台。</p>
+
+        <div class="ipc-grid">
+          <div class="ipc-left">
+            <div class="card">
+              <p class="card-title">前端 → 宿主（invoke）</p>
+              <div class="field">
+                <label for="ipcChannel">通道</label>
+                <input class="input" id="ipcChannel" value="ipc-echo" list="chList" spellcheck="false">
+                <datalist id="chList">
+                  <option value="ipc-echo"></option><option value="sysinfo"></option>
+                  <option value="displays"></option><option value="ntp"></option>
+                  <option value="bounds"></option><option value="hwnd"></option>
+                  <option value="yaml-all"></option><option value="clip-read"></option>
+                </datalist>
+              </div>
+              <div class="field">
+                <label for="ipcPayload">payload（JSON）</label>
+                <textarea class="input" id="ipcPayload" spellcheck="false">{"msg":"你好 JadeView","n":42}</textarea>
+              </div>
+              <div class="row">
+                <button class="btn accent" id="btnInvoke">发送</button>
+                <span class="lat">往返耗时 <b id="lastLat">—</b></span>
+              </div>
+              <p class="hint">payload 原样送达 Go 处理器；通道可下拉选常用项或手输任意通道名。</p>
+            </div>
+
+            <div class="card">
+              <p class="card-title">宿主 → 前端（推送）</p>
+              <div class="field">
+                <label>消息推送（send_ipc_message → jade.on）</label>
+                <div class="row"><button class="btn" data-inv="ipc-push">连发 3 条推送（间隔 400ms）</button></div>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Toast 契约（§12：error 不自动消失）</label>
+                <div class="row">
+                  <button class="btn" data-toast="info">info</button>
+                  <button class="btn" data-toast="success">success</button>
+                  <button class="btn" data-toast="warning">warning</button>
+                  <button class="btn" data-toast="error">error</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card ipc-logcard">
+            <div class="log-head">
+              <p class="card-title" style="margin:0">通信日志</p>
+              <button class="btn" id="btnClearLog" style="height:26px;padding:0 10px;font-size:12px">清空</button>
+            </div>
+            <!-- log-fill 占位定高，.log 绝对定位填充：内容再多也只在内部滚动，不撑高卡片 -->
+            <div class="log-fill">
+              <div class="log" id="ipcLog" role="log" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 窗口 -->
+      <section class="page" id="page-window">
+        <h1>窗口</h1>
+        <p class="lead">窗口状态控制与查询（结果经 Toast 反馈）。</p>
+
+        <div class="card">
+          <p class="card-title">状态</p>
+          <div class="switch-row" style="margin-bottom:var(--sp-m)">
+            <label class="switch">
+              <input type="checkbox" id="swTop" aria-label="窗口置顶">
+              <span class="track"></span><span class="knob"></span>
+            </label>
+            <span>窗口置顶</span>
+          </div>
+          <div class="row">
+            <button class="btn" data-inv="minimize">最小化</button>
+            <button class="btn" data-inv="fullscreen">全屏切换</button>
+            <button class="btn" data-inv="flash">任务栏闪烁</button>
+            <button class="btn" data-inv="devtools">开/关 DevTools</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="card-title">查询</p>
+          <div class="row">
+            <button class="btn" data-inv="bounds">窗口边界</button>
+            <button class="btn" data-inv="hwnd">句柄 ⇄ 窗口ID</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 系统 -->
+      <section class="page" id="page-system">
+        <h1>系统</h1>
+        <p class="lead">系统对话框、通知、剪贴板与 NTP 网络时间。</p>
+
+        <div class="card">
+          <p class="card-title">对话框 / 通知（异步回调桥）</p>
+          <div class="row">
+            <button class="btn" data-inv="open-file">打开文件</button>
+            <button class="btn" data-inv="save-file">保存文件</button>
+            <button class="btn" data-inv="msgbox">消息框</button>
+            <button class="btn" data-inv="notify">系统通知</button>
+          </div>
+          <p class="hint">对话框结果由 Go 异步回调经 dialog-result 推回，见「IPC 测试」页日志或 Toast。</p>
+        </div>
+
+        <div class="card">
+          <p class="card-title">剪贴板 / 时间</p>
+          <div class="row">
+            <button class="btn" data-inv="clip-write">写入剪贴板</button>
+            <button class="btn" data-inv="clip-read">读取剪贴板</button>
+            <button class="btn" data-inv="ntp">NTP 网络时间</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 存储 -->
+      <section class="page" id="page-storage">
+        <h1>存储</h1>
+        <p class="lead">YAML 持久化（存于 data_directory，防路径穿越、原子写入）。</p>
+
+        <div class="card">
+          <p class="card-title">demo.yaml</p>
+          <div class="row">
+            <button class="btn accent" data-inv="yaml-set">写入示例数据</button>
+            <button class="btn" data-inv="yaml-get">读取 app.name</button>
+            <button class="btn" data-inv="yaml-all">读取全部</button>
+          </div>
+          <div class="log" id="yamlOut" style="height:120px;margin-top:var(--sp-m)"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Toast 容器（右下角堆叠，error 用 assertive） -->
+<div id="toasts" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
