@@ -38,9 +38,14 @@ func GetWebViewURL(windowID uint32) (string, bool) {
 	})
 }
 
-// GetWindowHWND 仅对 CreateBorderlessWindow 创建的窗口返回原生句柄；标准窗口返回 0。
+// GetWindowHWND 返回窗口原生句柄（beta.9 起支持所有方法创建的窗口）。
 func GetWindowHWND(windowID uint32) uintptr {
 	return uintptr(C.get_window_hwnd(C.uint32_t(windowID)))
+}
+
+// GetWindowID 根据 HWND 反查窗口 ID（beta.9 新增），0 表示未找到。
+func GetWindowID(hwnd uintptr) uint32 {
+	return uint32(C.get_window_id(C.int32_t(hwnd)))
 }
 
 // --- 尺寸 / 可调整 ---

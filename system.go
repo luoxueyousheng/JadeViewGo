@@ -67,11 +67,15 @@ func IsWindows11() bool {
 	return C.is_windows_11() == 1
 }
 
-// GetPrinterList 返回打印机名称 JSON 数组。
-func GetPrinterList() (string, bool) {
-	return bufCallInt(4096, func(buf *C.char, n C.int32_t) C.int32_t {
-		return C.jade_get_printer_list(buf, n)
-	})
+// GetPrinterList 返回打印机名称 JSON 数组和打印机数量。
+// 注意：jade_get_printer_list 返回的是打印机数量（非 1=成功），不能走 bufCallInt。
+func GetPrinterList() (string, int32, bool) {
+	buf := make([]byte, 16384)
+	rc := C.jade_get_printer_list((*C.char)(unsafe.Pointer(&buf[0])), C.int32_t(len(buf)))
+	if rc < 0 {
+		return "", int32(rc), false
+	}
+	return cBufToString(buf), int32(rc), true
 }
 
 // --- 打印 ---

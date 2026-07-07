@@ -7,6 +7,7 @@ package jadeview
 // 原理同 amd64（见 jadeview_windows_embed.go）。
 
 import (
+	"bytes"
 	_ "embed"
 	"os"
 	"path/filepath"
@@ -22,7 +23,8 @@ func init() {
 		return
 	}
 	dst := filepath.Join(dir, "JadeView.dll")
-	if fi, err := os.Stat(dst); err != nil || fi.Size() != int64(len(jadeViewDLL)) {
+	// 按内容比较（防同尺寸篡改/版本混淆），不一致才重写
+	if existing, err := os.ReadFile(dst); err != nil || !bytes.Equal(existing, jadeViewDLL) {
 		_ = os.WriteFile(dst, jadeViewDLL, 0o644)
 	}
 	_, _ = syscall.LoadLibrary(dst)

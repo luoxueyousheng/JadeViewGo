@@ -418,17 +418,8 @@ typedef struct TrayMenuItemDesc {
 // C API 函数声明（自动从 src/ffi/ 生成）
 // -----------------------
 
-// 调用约定：对应 Rust 的 `extern "system"`。
-//   - Windows x86 (32 位)：__stdcall（带 @N 修饰）；
-//   - Windows x64 / arm64：单一调用约定，__stdcall 被忽略，等价于 __cdecl；
-//   - MSVC 与 MinGW/GCC 均识别 __stdcall，故二者头文件 ABI 一致；
-//   - 非 Windows 平台：留空（本库仅 Windows，可正常解析头文件）。
 #ifndef JADEVIEW_CALL
-#  if defined(_WIN32)
-#    define JADEVIEW_CALL __stdcall
-#  else
-#    define JADEVIEW_CALL
-#  endif
+#define JADEVIEW_CALL __stdcall
 #endif
 
 // 回调函数类型定义
@@ -505,8 +496,10 @@ uint32_t JADEVIEW_CALL create_webview_window(const char* url, uint32_t parent_wi
 // 独立无边框 WebView 窗口：内部为普通承载窗口 + WebView，返回 `window_id`。
 // 仅此类窗口可通过 `get_window_hwnd` 获取原生句柄。
 uint32_t JADEVIEW_CALL create_borderless_webview_window(const char* url, const struct WebViewSettings* webview_settings);
-// 仅对 `create_borderless_webview_window` 创建的窗口返回 HWND；标准窗口始终返回 0。
+// 获取创建的窗口句柄 HWND；标准窗口始终返回 0。
 size_t JADEVIEW_CALL get_window_hwnd(uint32_t window_id);
+// 根据 HWND 获取窗口 ID
+uint32_t JADEVIEW_CALL get_window_id(int32_t hwnd);
 // 导航到URL
 int32_t JADEVIEW_CALL navigate_to_url(uint32_t window_id, const char* url, const char* headers_json);
 // 刷新webview页面

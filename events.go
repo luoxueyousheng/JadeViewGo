@@ -143,12 +143,20 @@ func On(event string, handler EventHandler) (uint32, bool) {
 	cev := C.CString(event)
 	defer C.free(unsafe.Pointer(cev))
 	cbID := uint32(C.jade_on(cev, C.jv_get_tramp(C.int(slot))))
-	reg.cbID = cbID
+	evMu.Lock()
+	reg.cbID = cbID // 锁内赋值，避免与 Off 的读取竞态
+	evMu.Unlock()
 	return cbID, true
 }
 
-// Off 注销事件处理器。
+// Off 注销事件处理器。注销成功后才释放对应槽位。
 func Off(event string, cbID uint32) bool {
+	cev := C.CString(event)
+	defer C.free(unsafe.Pointer(cev))
+	ok := C.jade_off(cev, C.uint32_t(cbID)) == 1
+	if !ok {
+		return false
+	}
 	evMu.Lock()
 	for i := range evSlots {
 		if r := evSlots[i]; r != nil && r.event == event && r.cbID == cbID {
@@ -157,10 +165,7 @@ func Off(event string, cbID uint32) bool {
 		}
 	}
 	evMu.Unlock()
-
-	cev := C.CString(event)
-	defer C.free(unsafe.Pointer(cev))
-	return C.jade_off(cev, C.uint32_t(cbID)) == 1
+	return true
 }
 
 // RegisterIPCHandler 订阅前端通过指定 channel 发送的 IPC 消息。
@@ -183,5 +188,12 @@ func RegisterIPCHandler(channel string, handler EventHandler) bool {
 
 	cch := C.CString(channel)
 	defer C.free(unsafe.Pointer(cch))
-	return C.register_ipc_handler(cch, C.jv_get_tramp(C.int(slot))) == 1
+	if C.register_ipc_handler(cch, C.jv_get_tramp(C.int(slot))) != 1 {
+		// 注册失败，释放槽位，避免永久泄漏
+		evMu.Lock()
+		evSlots[slot] = nil
+		evMu.Unlock()
+		return false
+	}
+	return true
 }

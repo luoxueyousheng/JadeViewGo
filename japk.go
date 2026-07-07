@@ -22,6 +22,7 @@ func SetPublicKey(publicKey string) int32 {
 // LoadFromBytes 从内存加载 JAPK 文件（支持 v2 签名包与混淆包）。
 //   - 已设公钥：必须是签名包，验签后加载；
 //   - 未设公钥：仅支持混淆包（JPKBIN02）。
+//
 // app_name / app_signature 须与 Init 时一致。返回 0=成功，负数=错误码。
 // 错误信息也会通过事件异步通知。
 func LoadFromBytes(data []byte) int32 {

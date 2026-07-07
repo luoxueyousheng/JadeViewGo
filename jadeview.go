@@ -1,9 +1,11 @@
 // Package jadeview 是 JadeView WebView 库的 Go(cgo)封装。
 //
-// 本文件为最小骨架：仅封装初始化、版本号、消息循环、退出等少量函数，
-// 用于先跑通编译与链接。完整 API（窗口/托盘/对话框/YAML/system 等）待后续补全。
+// 本文件封装生命周期函数（初始化、版本号、消息循环、退出）。
+// 其余 API 按模块拆分：窗口(window*.go)、事件(events.go)、对话框(dialog*.go)、
+// 托盘(tray.go)、YAML(yaml.go)、系统工具(system.go)、JAPK(japk.go)。
 //
-// 链接方式：静态链接 libJadeView.a（见 jadeview_linux_amd64.go / _arm64.go）。
+// 链接方式：Linux 静态链接 libJadeView.a（jadeview_linux_*.go）；
+// Windows 延迟链接 MSVC DLL + go:embed 自包含（jadeview_windows_*.go）。
 package jadeview
 
 /*

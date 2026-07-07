@@ -13,6 +13,7 @@ package jadeview
 // 注意：目标机仍需安装 Edge WebView2 Runtime（系统级组件，任何方案都去不掉）。
 
 import (
+	"bytes"
 	_ "embed"
 	"os"
 	"path/filepath"
@@ -29,8 +30,9 @@ func init() {
 	}
 	dst := filepath.Join(dir, "JadeView.dll")
 
-	// 仅当不存在或大小不一致时才写，避免每次启动重复写 / 多进程争用已加载的文件。
-	if fi, err := os.Stat(dst); err != nil || fi.Size() != int64(len(jadeViewDLL)) {
+	// 仅当内容与内置副本不一致时才写（按字节比较，防止同尺寸的篡改/版本混淆），
+	// 避免每次启动重复写 / 多进程争用已加载的文件。
+	if existing, err := os.ReadFile(dst); err != nil || !bytes.Equal(existing, jadeViewDLL) {
 		_ = os.WriteFile(dst, jadeViewDLL, 0o644)
 	}
 
