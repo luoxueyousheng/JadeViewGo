@@ -111,10 +111,6 @@ func main() {
 go run ./example        # Windows 只要有 Go；Linux 需先装好 cgo 依赖（见上）
 ```
 
-页面按仓库根目录的 `DESIGN.md`（Microsoft Fluent Design 2）实现：`title-overlay` 自绘标题栏
-（窗口控制按钮由库内置）、Mica 透明窗口、明暗语义色 token、NavigationView 滑动指示条、
-SVG 图标（禁 Emoji）、右下角 Toast 契约、标准缓动与 `prefers-reduced-motion` 适配。
-
 演示内容：
 
 - **外观**：颜色模式切换（浅色/深色/跟随系统，联动 `SetTheme` + 标题栏图标色）、
