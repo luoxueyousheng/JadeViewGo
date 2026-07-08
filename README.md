@@ -18,9 +18,25 @@
 
 ## 安装
 
+要求 **Go 1.23+**。作为依赖引入你的项目:
+
 ```bash
-go get github.com/luoxueyousheng/JadeViewGo
+go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
+go get github.com/luoxueyousheng/JadeViewGo@v0.1.0    # 锁定指定版本
 ```
+
+`go.mod` 里会写成 `require github.com/luoxueyousheng/JadeViewGo v0.1.0`。
+Windows 侧纯 Go,拉下来即可构建,无需 C 工具链;Linux 侧走 cgo,`go get` 后构建还需
+系统 GTK3/WebKit2GTK 开发包(见下「Linux amd64」)。
+
+不想引入依赖、只想先跑一眼内置示例(示例是模块子包,可直接运行):
+
+```bash
+go run github.com/luoxueyousheng/JadeViewGo/example@v0.1.0
+```
+
+> 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
+> `@v0.1.0`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
 
 ## 各平台使用方式
 
