@@ -130,7 +130,7 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Println("[app-ready] 站点 URL:", url)
 
-	// 按 DESIGN.md（Fluent 2）建窗：title-overlay 内置窗口控制按钮 + 透明窗口 + Mica 材质
+	// title-overlay 内置窗口控制按钮 + 透明窗口 + Mica 材质
 	opts := jadeview.DefaultWindowOptions()
 	opts.Title = "JadeView Go Demo (" + runtime.GOOS + "/" + runtime.GOARCH + ")"
 	opts.Width = 1000
