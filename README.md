@@ -65,12 +65,17 @@ Evergreen Bootstrapper 安装）。
 **前置依赖**（Debian/Ubuntu 系；Linux 侧走 cgo，需要 C 工具链）：
 
 ```bash
-sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+sudo apt install build-essential pkg-config \
+    libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev
 ```
 
+> **libxdo-dev 不能漏**：预编译的 `libJadeView.a` 硬引用了 libxdo（xdotool，
+> 托盘菜单发送按键序列用），缺它链接会报 `cannot find -lxdo`。
+>
 > 老发行版若只有 WebKit2GTK 4.0（没有 4.1 包），把
 > `jadeview_linux_amd64.go` / `jadeview_linux_arm64.go` 里的
-> `webkit2gtk-4.1` 改成 `webkit2gtk-4.0` 即可。
+> `webkit2gtk-4.1` 改成 `webkit2gtk-4.0` 即可（先用
+> `pkg-config --exists webkit2gtk-4.1` 确认装的是哪个）。
 
 **构建 / 运行**：
 
@@ -79,12 +84,25 @@ CGO_ENABLED=1 go build ./...
 go run ./example
 ```
 
-`libJadeView.a` 静态链接进二进制；GTK3/WebKit2GTK 走系统动态库，目标机装运行时包即可：
+`libJadeView.a` 静态链接进二进制；GTK3/WebKit2GTK/libxdo 走系统动态库，目标机装运行时包即可：
 
 ```bash
 # 目标机（运行时，非 -dev 包）
-sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0
+sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libxdo3
 ```
+
+**无桌面 / 远程 X11 / 无 GPU 环境**（headless 服务器、NAS、SSH X11 转发等）：
+WebKit 默认走 GPU 合成，拿不到 EGL/DRI（`/dev/dri` 缺失或无权限）时会直接崩。
+用环境变量强制软件渲染：
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 \
+LIBGL_ALWAYS_SOFTWARE=1 go run ./example
+```
+
+> SSH X11 转发时要用**原登录用户**跑；`su`/`sudo` 切到 root 会丢失 X 授权
+> cookie，报 `No authorisation provided`。GUI 需要 X11/Wayland 桌面，纯 headless
+> 只能 `go build ./...` 验证编译链接是否通过。
 
 ### Linux arm64
 
