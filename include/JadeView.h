@@ -419,7 +419,11 @@ typedef struct TrayMenuItemDesc {
 // -----------------------
 
 #ifndef JADEVIEW_CALL
+#if defined(_WIN32)
 #define JADEVIEW_CALL __stdcall
+#else
+#define JADEVIEW_CALL
+#endif
 #endif
 
 // 回调函数类型定义
