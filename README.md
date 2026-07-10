@@ -197,7 +197,7 @@ Linux 实现是不带后缀的 cgo 文件(`//go:build linux`)。
 | 模块 | 主要函数 |
 |------|----------|
 | 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` / `Preload`（Windows 提前加载 DLL 并拿到错误;Linux 恒 nil） |
-| 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`）、`CreateBorderlessWindow`、`Navigate`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
+| 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`,默认值用 `DefaultWindowOptions`/`DefaultWebViewSettings`）、`CreateBorderlessWindow`、`Navigate`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
 | 窗口扩展 | 状态查询 `Is*`、`GetWindowBounds`、`GetWindowHWND`⇄`GetWindowID`、层级/背景/全屏/主题/缩放、DevTools、`SendIPCMessage`、任务栏进度/闪烁 |
 | 事件桥 | `On` / `Off` / `RegisterIPCHandler`（槽位池,上限 `MaxEventHandlers`=64） |
 | 对话框/菜单 | `ShowNotification`、`ShowOpenDialog`/`ShowSaveDialog`/`ShowMessageBox`/`ShowErrorBox`、右键菜单 `MenuItemCreate`/`SetContextMenuItems` |

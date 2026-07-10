@@ -51,20 +51,35 @@ func DefaultWindowOptions() WindowOptions {
 
 // WebViewSettings 对应 C 的 WebViewSettings。
 type WebViewSettings struct {
-	Autoplay               bool
-	BackgroundThrottling   bool
-	AllowRightClick        bool
-	UserAgent              string
-	PreloadJS              string
-	AllowFullscreen        bool
-	PostMessageWhitelist   string
-	CORSWhitelist          string
-	Autofill               bool
-	GeneralAutofillEnabled bool
-	Incognito              bool
-	DisableClipboard       bool
-	ProxyURL               string
-	Focused                bool
+	Autoplay               bool   // 允许媒体自动播放
+	BackgroundThrottling   bool   // true=禁用背景限速（false=库默认限速策略）
+	AllowRightClick        bool   // 允许页面右键菜单
+	UserAgent              string // 空=默认 UA
+	PreloadJS              string // 页面加载前注入的 JS，空=不注入
+	AllowFullscreen        bool   // 允许页面全屏
+	PostMessageWhitelist   string // postMessage 白名单（单个域名），空=默认
+	CORSWhitelist          string // CORS 来源白名单（逗号分隔），空=默认
+	Autofill               bool   // 账号/密码自动填充
+	GeneralAutofillEnabled bool   // 通用表单自动填充
+	Incognito              bool   // 无痕模式
+	DisableClipboard       bool   // 禁用剪贴板读写权限
+	ProxyURL               string // 代理，如 "http://host:port"/"socks5://host:port"，空=不使用
+	Focused                bool   // 创建后 WebView 自动获取焦点
+}
+
+// DefaultWebViewSettings 返回一组桌面应用常用默认值（与 DefaultWindowOptions 对称）：
+// 允许自动播放/右键/全屏/自动填充、创建即聚焦，其余零值（默认 UA、无预载 JS、无代理）。
+// 注意：CreateWindow 的 settings 传 nil 表示交给库用内部默认值，二者不保证逐项一致；
+// 需要在库默认基础上只改个别项时从本函数出发即可。
+func DefaultWebViewSettings() WebViewSettings {
+	return WebViewSettings{
+		Autoplay:               true,
+		AllowRightClick:        true,
+		AllowFullscreen:        true,
+		Autofill:               true,
+		GeneralAutofillEnabled: true,
+		Focused:                true,
+	}
 }
 
 // NotificationParams 对应 C 的 NotificationParams。
