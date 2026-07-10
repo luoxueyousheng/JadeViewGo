@@ -150,8 +150,9 @@ function applyPlatform() {
     ? '当前系统非 Windows 11，DWM 材质不可用，已改用纯色背景。'
     : `当前平台 ${ENV.os}：无 DWM 材质，已改用纯色背景（set_window_background_color）。`;
   const desc = $('#winDesc');
-  if (desc) desc.textContent =
-    `系统边框与标题栏（${ENV.os}）+ 纯色背景。DWM 材质与标题栏覆盖层为 Windows 专属，相关选项已停用。`;
+  if (desc) desc.textContent = ENV.os === 'windows'
+    ? 'title-overlay 边框（右上角控制按钮库内置）+ 纯色背景。当前非 Windows 11，Mica/Acrylic 材质不可用，相关选项已停用。'
+    : `系统边框与标题栏（${ENV.os}）+ 纯色背景。DWM 材质与标题栏覆盖层为 Windows 专属，相关选项已停用。`;
 }
 
 /* ============ 主题（颜色模式） ============ */
