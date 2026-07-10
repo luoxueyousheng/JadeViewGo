@@ -180,16 +180,19 @@ go run ./example
 - **WebView 设置**:`DefaultWebViewSettings` 起步,用 `PreloadJS` 在页面脚本运行前注入
   平台信息(`window.__JV_ENV`),前端同步读取做平台适配(标题栏/材质),`env` IPC 通道兜底。
 
-**前端站点加载(当前方案:库协议服务)**:示例把 `example/site/`(index.html + fluent.css +
-app.js)源码目录直接交给 `SetProtocolServicePath(dir, hotReload=true)`,返回的 URL 直接建窗
-导航;hotReload 下改动站点文件页面即时刷新,适合开发调试。**站点目录不要与 `Init` 的
-data_directory 相同或嵌套**——库持续写数据会触发「写→热载刷新」死循环。
+**前端站点加载(三选一,见 `onAppReady` 里的 `plan`)**:
 
-> 备用方案(代码保留于 `serveSite`,当前已屏蔽):`//go:embed all:site` 打成 `embed.FS`,
-> 运行时在 127.0.0.1 随机端口起进程内 HTTP 服务直出 embed.FS——**磁盘零前端文件**,不依赖
-> 源码目录,适合分发单 exe。纯内存官方替代是 JAPK 资源包(`LoadFromBytes`,需上游打包工具);
-> `data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航,窗口直接关闭)。
-> 托盘图标走内存 API(`TraySetIconFromData`,.ico 仅 Windows 传)。
+| plan | 方式 | 适用场景 |
+|------|------|----------|
+| 0(默认) | **JAPK 资源包**:`go:embed` 的 `app.japk` 经 `LoadFromBytes` 内存加载,再以特殊路径 `"japk"` 调 `SetProtocolServicePath` 切到内存 JAPK 模式,URL 形如 `JADE://<app_signature>` | 加密/混淆分发 |
+| 1 | **协议服务挂源码目录**:`SetProtocolServicePath("example/site", hotReload=true)`,改动站点文件页面即时刷新 | 开发调试 |
+| 2 | **进程内回环 HTTP**:127.0.0.1 随机端口直出 `embed.FS`,磁盘零前端文件 | 单 exe 分发(不想用 JAPK 时) |
+
+三种方式返回/构造的 URL 都直接建窗导航。注意:**协议服务的站点目录不要与 `Init` 的
+data_directory 相同或嵌套**——库持续写数据会触发「写→热载刷新」死循环;JAPK 的
+app_name/app_signature 必须与 `Init` 一致,加载错误详情经 `japk-load-failed` 事件回报;
+`data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航)。
+托盘图标走内存 API(`TraySetIconFromData`,.ico 仅 Windows 传)。
 
 ## API 总览
 

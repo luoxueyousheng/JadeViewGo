@@ -190,8 +190,12 @@ func GetFileIcon(path string, size int, windowID, ttlSeconds uint32) (string, bo
 	})
 }
 
-// SetProtocolServicePath 设置自定义协议服务路径，返回可访问的 URL。
-// hotReload 仅文件系统模式有效。
+// SetProtocolServicePath 设置自定义协议服务路径，返回可访问的 URL（直接用于建窗导航）。
+// rootPath 三种取值（beta.10 实测）：
+//   - 磁盘目录路径：文件系统模式，服务该目录（hotReload 仅此模式有效，改文件即时刷新页面）；
+//   - .japk 文件路径：挂载磁盘上的 JAPK 资源包；
+//   - 特殊值 "japk"：内存模式，服务 LoadFromBytes 已加载的资源包
+//     （须先加载成功，返回 URL 形如 JADE://<app_signature>）。
 func SetProtocolServicePath(rootPath string, hotReload bool) (string, bool) {
 	pool := &cstrPool{}
 	defer pool.free()

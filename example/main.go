@@ -34,11 +34,12 @@ import (
 	jadeview "github.com/luoxueyousheng/JadeViewGo"
 )
 
-// 前端站点（HTML/CSS/JS，含子目录）。
-// 当前启用方案：库内置协议服务 SetProtocolServicePath 直接挂 example/site 源码目录
-// （测试/开发用法，hotReload 下改页面文件即时刷新），返回的 URL 直接用于建窗导航。
-// 备用方案（已屏蔽，见 serveSite）：进程内 127.0.0.1 回环 HTTP 直出 embed.FS，
-// 零落盘、不依赖源码目录，适合分发单 exe——siteFS 即为此保留。
+// 前端站点（HTML/CSS/JS，含子目录）。加载方式三选一，见 onAppReady 里的 plan：
+//
+//	0 JAPK 资源包（app.japk 内存加载 + 协议服务 JAPK 模式，加密/混淆分发）
+//	1 协议服务挂 example/site 源码目录（hotReload 即时刷新，开发调试）
+//	2 进程内回环 HTTP 直出 embed.FS（零落盘，单 exe 分发）——siteFS 即为此保留
+//
 // `all:` 前缀确保以 . 和 _ 开头的文件也被包含。
 //
 //go:embed all:site
@@ -46,6 +47,9 @@ var siteFS embed.FS
 
 //go:embed icon.ico
 var iconICO []byte
+
+//go:embed app.japk
+var appJAPK []byte
 
 // titlebarHeight 标题栏覆盖层高度（像素），须与前端 fluent.css 里
 // #app 的网格行高（.title-bar 所在行）保持一致，否则内置控制按钮与自绘内容错位。
@@ -102,6 +106,10 @@ func main() {
 		fmt.Printf("[事件] 崩溃报告: %s\n", data) // data 为 Crash* 错误代码
 		return ""
 	})
+	jadeview.On(jadeview.EventJapkLoadFailed, func(_ uint32, data string) string {
+		fmt.Printf("[事件] JAPK 加载失败: %s\n", data) // LoadFromBytes 的错误详情异步回报
+		return ""
+	})
 
 	// 2) IPC 处理器（前端 jade.invoke 的目标）
 	registerIPCHandlers()
@@ -126,27 +134,53 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Println("[app-ready] 初始化成功")
 
-	// 前端站点（当前启用）：协议服务直接挂 example/site 源码目录，返回的 URL 直接导航。
-	// hotReload=true：改动站点文件页面自动刷新（仅监视站点目录，勿指向 dataDir）。
-	siteDir, err := resolveSiteDir()
-	if err != nil {
-		fmt.Println("找不到前端站点目录:", err)
-		jadeview.Exit()
-		return ""
+	// 前端加载方式（三选一）：
+	//   0 = JAPK 资源包：go:embed 的 app.japk 内存加载（未设公钥=混淆包 JPKBIN02），
+	//       再以特殊路径 "japk" 调 SetProtocolServicePath——协议服务转为内存 JAPK 模式；
+	//   1 = 协议服务挂 example/site 源码目录（hotReload：改页面文件即时刷新，适合开发调试）；
+	//   2 = 进程内 127.0.0.1 HTTP 直出 embed.FS（零落盘，适合分发单 exe）。
+	// 三种方式返回的 URL 都直接用于建窗导航（JAPK 模式形如 JADE://<app_signature>）。
+	plan := 0
+	var url string
+	switch plan {
+	case 0:
+		// app_name/app_signature 须与 Init 一致；错误详情经 japk-load-failed 事件异步回报
+		if rc := jadeview.LoadFromBytes(appJAPK); rc != 0 {
+			fmt.Println("[app-ready] JAPK 加载失败, 错误码:", rc)
+			jadeview.Exit()
+			return ""
+		}
+		u, ok := jadeview.SetProtocolServicePath("japk", false) // "japk"=服务 LoadFromBytes 加载的内存资源包
+		if !ok {
+			fmt.Println("协议服务(JAPK 模式)设置失败")
+			jadeview.Exit()
+			return ""
+		}
+		url = u
+	case 1:
+		siteDir, err := resolveSiteDir()
+		if err != nil {
+			fmt.Println("找不到前端站点目录:", err)
+			jadeview.Exit()
+			return ""
+		}
+		u, ok := jadeview.SetProtocolServicePath(siteDir, true)
+		if !ok {
+			fmt.Println("协议服务设置失败")
+			jadeview.Exit()
+			return ""
+		}
+		url = u
+	case 2:
+		u, err := serveSite()
+		if err != nil {
+			fmt.Println("启动内置站点服务失败:", err)
+			jadeview.Exit()
+			return ""
+		}
+		url = u
 	}
-	url, ok := jadeview.SetProtocolServicePath(siteDir, true)
-	if !ok {
-		fmt.Println("协议服务设置失败")
-		jadeview.Exit()
-		return ""
-	}
-	// 备用（已屏蔽）：进程内 127.0.0.1 HTTP 直出 embed.FS，零落盘。需要时换回：
-	// url, err := serveSite()
-	// if err != nil {
-	// 	fmt.Println("启动内置站点服务失败:", err)
-	// 	jadeview.Exit()
-	// 	return ""
-	// }
+
 	fmt.Println("[app-ready] 站点 URL:", url)
 
 	// 按平台建窗（前端经 PreloadJS 注入的 __JV_ENV 同步做界面适配，见 app.js applyPlatform）：
