@@ -188,11 +188,18 @@ go run ./example
 | 1 | **协议服务挂源码目录**:`SetProtocolServicePath("example/site", hotReload=true)`,改动站点文件页面即时刷新 | 开发调试 |
 | 2 | **进程内回环 HTTP**:127.0.0.1 随机端口直出 `embed.FS`,磁盘零前端文件 | 单 exe 分发(不想用 JAPK 时) |
 
-三种方式返回/构造的 URL 都直接建窗导航。注意:**协议服务的站点目录不要与 `Init` 的
-data_directory 相同或嵌套**——库持续写数据会触发「写→热载刷新」死循环;JAPK 的
-app_name/app_signature 必须与 `Init` 一致,加载错误详情经 `japk-load-failed` 事件回报;
-`data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航)。
-托盘图标走内存 API(`TraySetIconFromData`,.ico 仅 Windows 传)。
+三种方式返回/构造的 URL 都直接建窗导航。注意:
+
+- **协议服务的站点目录不要与 `Init` 的 data_directory 相同或嵌套**——库持续写数据会触发
+  「写→热载刷新」死循环。
+- **跨域与 IPC**:用在线或本地 http(s) URL(如 plan 2 的回环 HTTP、任意线上页面)而非
+  jade:// 资源方式(plan 0/1)加载页面时,页面源与库不同源,IPC 通讯(`jade.invoke`/
+  postMessage)可能被跨域限制拦截。`WebViewSettings.CORSWhitelist`/`PostMessageWhitelist`
+  可设白名单,但库**没有接口能查到它注册的临时域**,无法精确加白——示例用
+  `PostMessageWhitelist: "*"` 兜底;分发场景优先选 jade:// 同源方案(plan 0/1)。
+- JAPK 的 app_name/app_signature 必须与 `Init` 一致,加载错误详情经 `japk-load-failed`
+  事件回报;`data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航)。
+- 托盘图标走内存 API(`TraySetIconFromData`,.ico 仅 Windows 传)。
 
 ## API 总览
 
@@ -304,6 +311,10 @@ JadeView/
   RUNTIME_PANIC 直接 abort(已反馈上游)。调用前先探测会话 D-Bus 上有无
   `org.kde.StatusNotifierWatcher`,没有就跳过托盘——参考 `example/main.go` 的
   `hasStatusNotifierWatcher`(`dbus-send` 查 `NameHasOwner`)。
+- **http(s) 页面的 IPC 跨域风险**:页面以在线/本地 http(s) URL 加载(而非 jade:// 资源方式)时
+  与库不同源,IPC 可能被跨域拦截;`WebViewSettings.CORSWhitelist` 可设白名单,但库无接口查询
+  其注册的临时域,无法精确加白。规避:优先用协议服务/JAPK(jade:// 同源),或
+  `PostMessageWhitelist: "*"` 兜底。
 - **`jade-region-drag` 拖动区为 Windows 特性**(上游文档标注),Linux 请用 CSS `-webkit-app-region: drag`。
 - **`lib/` 下的二进制**是 JadeView 作者的第三方产物,**不在本项目 MIT 许可范围内**。
 

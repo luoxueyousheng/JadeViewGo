@@ -209,7 +209,10 @@ func onAppReady(windowID uint32, data string) string {
 	// PreloadJS 在页面任何脚本运行前注入：把平台信息挂到 window.__JV_ENV，
 	// 前端启动即可同步读取、无需异步等 "env" IPC（该通道仍保留作兜底）。
 	settings := jadeview.DefaultWebViewSettings()
-	settings.PostMessageWhitelist = "*" // 允许任意域名 postMessage（前端可按需过滤）
+	// 跨域兜底：http(s) URL 方式（plan 2）加载时页面与库不同源，IPC 可能被跨域拦截；
+	// 库无接口查询其注册的临时域、CORSWhitelist 无法精确加白，故放开 postMessage 白名单。
+	// jade:// 同源方案（plan 0/1）不受此影响。
+	settings.PostMessageWhitelist = "*"
 	settings.PreloadJS = fmt.Sprintf("window.__JV_ENV={os:%q,arch:%q,win11:%v};",
 		runtime.GOOS, runtime.GOARCH, win11)
 	mainWindowID = jadeview.CreateWindow(url, 0, &opts, &settings)
