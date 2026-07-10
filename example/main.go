@@ -149,7 +149,14 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	opts.Theme = jadeview.Theme.System
 	opts.AutoSaveState = true
-	mainWindowID = jadeview.CreateWindow(url, 0, &opts, nil)
+
+	// WebView 设置从常用默认值出发（允许自动播放/右键/全屏/自动填充），只改需要的项。
+	// PreloadJS 在页面任何脚本运行前注入：把平台信息挂到 window.__JV_ENV，
+	// 前端启动即可同步读取、无需异步等 "env" IPC（该通道仍保留作兜底）。
+	settings := jadeview.DefaultWebViewSettings()
+	settings.PreloadJS = fmt.Sprintf("window.__JV_ENV={os:%q,arch:%q,win11:%v};",
+		runtime.GOOS, runtime.GOARCH, runtime.GOOS == "windows" && jadeview.IsWindows11())
+	mainWindowID = jadeview.CreateWindow(url, 0, &opts, &settings)
 	if mainWindowID == 0 {
 		fmt.Println("创建窗口失败")
 		jadeview.Exit()

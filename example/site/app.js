@@ -132,8 +132,10 @@ function initSeg(root, onChange) {
   return { select };
 }
 
-/* ============ 运行环境（宿主经 "env" 通道下发，决定标题栏/材质适配） ============ */
-const ENV = { os: 'windows', arch: '', win11: true };   // 独立预览/旧宿主：按 Windows 全功能展示
+/* ============ 运行环境（决定标题栏/材质适配） ============
+ * 首选宿主 PreloadJS 注入的 window.__JV_ENV（页面脚本运行前已就绪，可同步读）；
+ * 不存在时启动流程会经 "env" IPC 兜底；两者都拿不到则按 Windows 全功能展示（独立预览）。 */
+const ENV = Object.assign({ os: 'windows', arch: '', win11: true }, window.__JV_ENV);
 function applyPlatform() {
   document.documentElement.dataset.os = ENV.os;         // CSS 据此隐藏自绘标题栏（Linux 用系统标题栏）
   const hasBackdrop = ENV.os === 'windows' && ENV.win11;
@@ -252,8 +254,10 @@ addEventListener('focus', () => delete document.documentElement.dataset.inactive
 moveIndicator(nav.querySelector('.nav-item.active'));
 if (hasJade) {
   (async () => {
-    const env = await inv('env', {}, true);           // 先取平台再适配（失败则按默认 Windows 处理）
-    try { Object.assign(ENV, JSON.parse(env)); } catch { }
+    if (!window.__JV_ENV) {                           // PreloadJS 未注入时经 IPC 兜底取平台
+      const env = await inv('env', {}, true);
+      try { Object.assign(ENV, JSON.parse(env)); } catch { }
+    }
     applyPlatform();
     await applyTheme();             // System 模式：探测明暗；非 Win11 时顺带铺纯色背景
     loadOverview();

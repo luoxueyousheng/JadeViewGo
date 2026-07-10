@@ -1,4 +1,4 @@
-# JadeView Go 封装
+﻿# JadeView Go 封装
 
 [JadeView](https://jade.run) WebView 桌面库的 Go 封装 —— 用 Go + HTML/CSS/JS 写跨平台桌面应用。窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时一应俱全,头文件 124 个导出函数全部封装。
 
@@ -29,18 +29,18 @@
 
 ```bash
 go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
-go get github.com/luoxueyousheng/JadeViewGo@v0.2.0    # 锁定指定版本
+go get github.com/luoxueyousheng/JadeViewGo@v0.2.1    # 锁定指定版本
 ```
 
 只想先跑一眼内置示例(示例是模块子包,可直接运行):
 
 ```bash
-go run github.com/luoxueyousheng/JadeViewGo/example@v0.2.0
+go run github.com/luoxueyousheng/JadeViewGo/example@v0.2.1
 ```
 
 > - 依赖拉下来后,**构建仍需满足对应平台的前置条件**(下一节);Linux 尤其别漏系统开发包。
 > - 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
->   `@v0.2.0`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
+>   `@v0.2.1`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
 
 ## 平台前置条件与上手
 
@@ -177,6 +177,8 @@ go run ./example
 - **系统**:异步对话框(打开/保存/消息框)、系统通知、剪贴板读写、NTP 网络时间。
 - **存储**:YAML 写入/读取/全量读取(存于 `Init` 的数据目录)。
 - **托盘**:右键菜单显示/隐藏窗口、退出(Linux 先探测 D-Bus 托盘协议,无支持则跳过,见「已知问题」)。
+- **WebView 设置**:`DefaultWebViewSettings` 起步,用 `PreloadJS` 在页面脚本运行前注入
+  平台信息(`window.__JV_ENV`),前端同步读取做平台适配(标题栏/材质),`env` IPC 通道兜底。
 
 **前端整目录内置,运行时零落盘**:`example/site/`(index.html + fluent.css + app.js)用
 `//go:embed all:site` 打成 `embed.FS` 编进 exe;运行时在 127.0.0.1 随机端口起进程内 HTTP
