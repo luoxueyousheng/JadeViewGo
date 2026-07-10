@@ -114,8 +114,10 @@ func main() {
 	// 2) IPC 处理器（前端 jade.invoke 的目标）
 	registerIPCHandlers()
 
-	// 3) 初始化（版本号在 Init 之后才可取）
-	if !jadeview.Init(true, logPath, dataDir, "jadeview-go-demo", "jadeview-go-demo-signature", true) {
+	// 3) 初始化（版本号在 Init 之后才可取）。
+	// app_signature 建议用反域名格式（如 com.jadeviewgo.demo）：它会成为 JAPK 模式下
+	// JADE:// URL 的主机名，且须与 JAPK 打包时的签名一致。
+	if !jadeview.Init(true, logPath, dataDir, "jadeview-go-demo", "com.jadeviewgo.demo", true) {
 		fmt.Println("Init 失败")
 		return
 	}

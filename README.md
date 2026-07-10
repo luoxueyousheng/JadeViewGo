@@ -152,8 +152,9 @@ func main() {
         jadeview.Exit()
         return ""
     })
-    // Init(开发模式, 日志路径, 数据目录, 应用名, 应用签名≥6字符, 单实例)
-    jadeview.Init(true, "", "", "my-app", "my-app-signature", false)
+    // Init(开发模式, 日志路径, 数据目录, 应用名, 应用签名, 单实例)
+    // 签名≥6字符,建议反域名格式——JAPK 模式下它就是 JADE:// URL 的主机名
+    jadeview.Init(true, "", "", "my-app", "com.example.myapp", false)
     jadeview.RunMessageLoop() // 阻塞直到退出
 }
 ```
@@ -300,7 +301,8 @@ JadeView/
 
 - **上游版本**:当前全部为 v2.3.0-beta.10,Windows DLL 与 Linux 库已统一。
 - **`app-ready` 之后再调持久化 API**:YAML 等依赖 `Init` 的 `data_directory` 就绪。
-- **`app_signature` 至少 6 个字符**,过短 `Init` 返回失败且不启动 GUI 线程。
+- **`app_signature` 至少 6 个字符**,过短 `Init` 返回失败且不启动 GUI 线程;建议反域名格式
+  (如 `com.example.myapp`)——JAPK 模式下它会作为 `JADE://` URL 的主机名。
 - **Windows 杀软告警**:个别杀软对「释放 DLL 并加载」或浮点跳板的可执行内存分配有
   启发式告警,属正常;可引导用户加白。若 DLL 释放/加载被拦截,首次 API 调用会 panic——
   用 `Preload()` 在启动早期探测并优雅提示。

@@ -247,7 +247,8 @@ func WindowCount() uint32 {
 //   - logPath      : 日志路径（可空字符串）
 //   - dataDir      : 数据目录（可空字符串）
 //   - appName      : 应用名，必填、非纯空白
-//   - appSignature : 应用签名，trim 后至少 6 个 Unicode 字符
+//   - appSignature : 应用签名，trim 后至少 6 个 Unicode 字符；建议反域名格式
+//     （如 com.example.myapp）——它会成为 JAPK 模式下 JADE:// URL 的主机名
 //   - singleInstance: 是否启用单实例
 //
 // 返回 true 表示成功。注意：宿主仍应在 jade_on("app-ready", ...) 回调里
