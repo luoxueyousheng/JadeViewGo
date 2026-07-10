@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -203,19 +204,21 @@ func jsonNum(data, key string) float64 {
 }
 
 // setupTray 创建托盘图标与右键菜单。
-// Windows 直接用 .ico；Linux 托盘依赖桌面环境的 appindicator 支持，
-// 创建失败（如无托盘协议的桌面）时跳过，不影响其余功能。
+// Windows 直接用 .ico；Linux 托盘走 StatusNotifier 协议（KDE 原生支持，
+// GNOME 需 AppIndicator 扩展），先经 D-Bus 探测，无协议实现时跳过。
 func setupTray() {
+	if runtime.GOOS == "linux" && !hasStatusNotifierWatcher() {
+		fmt.Println("[托盘] 跳过：桌面无 StatusNotifier 托盘协议（GNOME 需安装 AppIndicator 扩展）")
+		return
+	}
 	trayID = jadeview.TrayCreate()
 	if trayID == 0 {
 		fmt.Println("[托盘] 创建失败（当前桌面环境可能不支持，跳过）")
 		return
 	}
 	if runtime.GOOS == "windows" {
-		jadeview.TraySetIconFromData(trayID, iconICO) // 内存图标，不落盘（.ico 仅 Windows）
+		jadeview.TraySetIconFromData(trayID, iconICO) // 内存图标，不落盘（.ico 是 Windows 格式）
 	}
-	// Linux 暂不设自定义图标（用系统默认）：beta.10 给 set_tray_icon_from_data 喂 .ico
-	// 数据会导致库 GUI 线程 RUNTIME_PANIC 直接 abort（已反馈上游）。
 	jadeview.TraySetTooltip(trayID, "JadeView Go Demo")
 	jadeview.TraySetMenu(trayID, []jadeview.TrayMenuItem{
 		{Type: jadeview.TrayItem.Normal, Key: "show", Label: "显示窗口"},
@@ -225,6 +228,20 @@ func setupTray() {
 	})
 	jadeview.TraySetVisible(trayID, true)
 	fmt.Printf("[托盘] 已创建 id=%d\n", trayID)
+}
+
+// hasStatusNotifierWatcher 检查会话 D-Bus 上是否有托盘协议实现
+// （org.kde.StatusNotifierWatcher：KDE 原生、GNOME 装 AppIndicator 扩展后有）。
+// beta.10 的 tray_create 在无托盘协议的桌面上会让库 GUI 线程 panic 而非返回 0
+// （已反馈上游），故必须先行探测；探测失败按不支持处理，宁可无托盘也不崩。
+func hasStatusNotifierWatcher() bool {
+	out, err := exec.Command("dbus-send", "--session", "--dest=org.freedesktop.DBus",
+		"--type=method_call", "--print-reply", "/org/freedesktop/DBus",
+		"org.freedesktop.DBus.NameHasOwner", "string:org.kde.StatusNotifierWatcher").Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "true")
 }
 
 func onTrayMenuCommand(_ uint32, data string) string {

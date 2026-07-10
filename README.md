@@ -176,7 +176,7 @@ go run ./example
 - **窗口**:置顶开关、最小化、全屏、任务栏闪烁、边界查询、HWND⇄窗口ID 互查、DevTools。
 - **系统**:异步对话框(打开/保存/消息框)、系统通知、剪贴板读写、NTP 网络时间。
 - **存储**:YAML 写入/读取/全量读取(存于 `Init` 的数据目录)。
-- **托盘**:右键菜单显示/隐藏窗口、退出(Linux 依赖桌面环境托盘支持,失败自动跳过)。
+- **托盘**:右键菜单显示/隐藏窗口、退出(Linux 先探测 D-Bus 托盘协议,无支持则跳过,见「已知问题」)。
 
 **前端整目录内置,运行时零落盘**:`example/site/`(index.html + fluent.css + app.js)用
 `//go:embed all:site` 打成 `embed.FS` 编进 exe;运行时在 127.0.0.1 随机端口起进程内 HTTP
@@ -294,7 +294,11 @@ JadeView/
   用 `Preload()` 在启动早期探测并优雅提示。
 - **事件槽位上限**:`On` 与 `RegisterIPCHandler` **共享** `MaxEventHandlers`=64 个槽位;
   IPC handler 无注销 API(上游头文件亦无),注册后**永久占用**一个槽位,规划通道数量时留意。
-- **Linux 托盘**:依赖桌面环境(appindicator 等)支持,无托盘协议的环境创建会失败,代码已容错跳过。
+- **Linux 托盘会崩、须先探测**:beta.10 的 `tray_create` 在**没有 StatusNotifier 托盘协议**的
+  桌面(如 Debian/GNOME 默认桌面,需另装 AppIndicator 扩展)上不是返回 0,而是让库 GUI 线程
+  RUNTIME_PANIC 直接 abort(已反馈上游)。调用前先探测会话 D-Bus 上有无
+  `org.kde.StatusNotifierWatcher`,没有就跳过托盘——参考 `example/main.go` 的
+  `hasStatusNotifierWatcher`(`dbus-send` 查 `NameHasOwner`)。
 - **`jade-region-drag` 拖动区为 Windows 特性**(上游文档标注),Linux 请用 CSS `-webkit-app-region: drag`。
 - **`lib/` 下的二进制**是 JadeView 作者的第三方产物,**不在本项目 MIT 许可范围内**。
 
