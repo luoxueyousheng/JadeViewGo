@@ -64,6 +64,9 @@ func main() {
 	// dataDir 是库自身的运行时数据目录（WebView2 用户数据、YAML 存储），无法免除。
 	dataDir = filepath.Join(os.TempDir(), "jadeview-demo", "data")
 	_ = os.MkdirAll(dataDir, 0o755)
+	// 开发模式下把库日志落盘，崩溃时（如 RUNTIME_PANIC）可直接查 panic 详情
+	logPath := filepath.Join(os.TempDir(), "jadeview-demo", "jadeview.log")
+	fmt.Println("库日志:", logPath)
 
 	// 1) app-ready 之前注册事件（事件名用库提供的 Event* 常量，避免拼错）
 	jadeview.On(jadeview.EventAppReady, onAppReady)
@@ -102,7 +105,7 @@ func main() {
 	registerIPCHandlers()
 
 	// 3) 初始化（版本号在 Init 之后才可取）
-	if !jadeview.Init(true, "", dataDir, "jadeview-go-demo", "jadeview-go-demo-signature", true) {
+	if !jadeview.Init(true, logPath, dataDir, "jadeview-go-demo", "jadeview-go-demo-signature", true) {
 		fmt.Println("Init 失败")
 		return
 	}
@@ -130,15 +133,19 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Println("[app-ready] 站点 URL:", url)
 
-	// 按 DESIGN.md（Fluent 2）建窗：title-overlay 内置窗口控制按钮 + 透明窗口 + Mica 材质
+	// 按平台建窗（前端启动时经 "env" 通道取平台，同步做界面适配，见 app.js applyPlatform）：
+	//   Windows: title-overlay（库内置右上角控制按钮）+ 透明窗口 + Mica 材质（Fluent 2 推荐组合）
+	//   Linux  : DWM 材质/标题栏覆盖层不可用，用系统边框+标题栏、不透明窗口，背景由前端设纯色
 	opts := jadeview.DefaultWindowOptions()
 	opts.Title = "JadeView Go Demo (" + runtime.GOOS + "/" + runtime.GOARCH + ")"
 	opts.Width = 1000
 	opts.Height = 720
 	opts.MinWidth = 640
 	opts.MinHeight = 480
-	opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮
-	opts.Transparent = true                            // 配合 backdrop 材质
+	if runtime.GOOS == "windows" {
+		opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮
+		opts.Transparent = true                            // 配合 backdrop 材质
+	}
 	opts.Theme = jadeview.Theme.System
 	opts.AutoSaveState = true
 	mainWindowID = jadeview.CreateWindow(url, 0, &opts, nil)
@@ -149,10 +156,13 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Printf("[app-ready] 窗口创建成功 id=%d\n", mainWindowID)
 
-	// 主背景 Mica；标题栏覆盖层高 40，与页面 .title-bar / #app 网格行高保持一致。
+	// Windows 专属外观：主背景 Mica；标题栏覆盖层高 40，与页面 .title-bar / #app 网格行高一致。
 	// 图标色初始按浅色主题给，前端探测到实际明暗后经 apply-titlebar 通道再同步。
-	jadeview.SetBackdrop(mainWindowID, jadeview.Backdrop.Mica)
-	jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
+	// Linux 走系统标题栏，纯色背景由前端启动时经 set-backdrop(none) 设置。
+	if runtime.GOOS == "windows" {
+		jadeview.SetBackdrop(mainWindowID, jadeview.Backdrop.Mica)
+		jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
+	}
 
 	setupTray()
 	return ""
@@ -201,7 +211,11 @@ func setupTray() {
 		fmt.Println("[托盘] 创建失败（当前桌面环境可能不支持，跳过）")
 		return
 	}
-	jadeview.TraySetIconFromData(trayID, iconICO) // 内存图标，不落盘
+	if runtime.GOOS == "windows" {
+		jadeview.TraySetIconFromData(trayID, iconICO) // 内存图标，不落盘（.ico 仅 Windows）
+	}
+	// Linux 暂不设自定义图标（用系统默认）：beta.10 给 set_tray_icon_from_data 喂 .ico
+	// 数据会导致库 GUI 线程 RUNTIME_PANIC 直接 abort（已反馈上游）。
 	jadeview.TraySetTooltip(trayID, "JadeView Go Demo")
 	jadeview.TraySetMenu(trayID, []jadeview.TrayMenuItem{
 		{Type: jadeview.TrayItem.Normal, Key: "show", Label: "显示窗口"},
@@ -234,6 +248,13 @@ func onTrayMenuCommand(_ uint32, data string) string {
 }
 
 func registerIPCHandlers() {
+	// --- 运行环境：前端启动时先取平台，据此适配标题栏/材质（见 app.js applyPlatform） ---
+	jadeview.RegisterIPCHandler("env", func(_ uint32, _ string) string {
+		win11 := runtime.GOOS == "windows" && jadeview.IsWindows11()
+		b, _ := json.Marshal(map[string]any{"os": runtime.GOOS, "arch": runtime.GOARCH, "win11": win11})
+		return string(b)
+	})
+
 	// --- 外观：主题 / 标题栏 / 材质 / 缩放 ---
 
 	// 设置窗口主题：payload {"mode":"Light"|"Dark"|"System"}
@@ -248,6 +269,9 @@ func registerIPCHandlers() {
 
 	// 同步标题栏覆盖层图标色：payload {"dark":true|false}（仅样式，按钮功能库内置）
 	jadeview.RegisterIPCHandler("apply-titlebar", func(wid uint32, data string) string {
+		if runtime.GOOS != "windows" {
+			return "标题栏覆盖层仅 Windows 支持，当前使用系统标题栏"
+		}
 		if strings.Contains(data, "true") {
 			jadeview.SetTitlebarOverlayStyle(wid, titlebarHeight, "#FFFFFF", "#3A3A3A")
 			return "标题栏: 深色图标方案"
@@ -257,6 +281,7 @@ func registerIPCHandlers() {
 	})
 
 	// 切换窗口材质：payload {"type":"mica"|"micaAlt"|"acrylic"|"none","color":"#RRGGBBAA"}
+	// 纯色（none→set_window_background_color）全平台可用；DWM 材质仅 Windows 11。
 	jadeview.RegisterIPCHandler("set-backdrop", func(wid uint32, data string) string {
 		t := jsonStr(data, "type")
 		if t == "none" {
@@ -266,6 +291,9 @@ func registerIPCHandlers() {
 			}
 			ok := jadeview.SetBackgroundColor(wid, color)
 			return fmt.Sprintf("纯色背景 %s: %v", color, ok)
+		}
+		if runtime.GOOS != "windows" {
+			return "系统材质（Mica/Acrylic）仅 Windows 11 支持，请使用纯色背景"
 		}
 		ok := jadeview.SetBackdrop(wid, t)
 		return fmt.Sprintf("set_window_backdrop(%s): %v", t, ok)

@@ -82,7 +82,8 @@
         </div>
         <div class="card">
           <p class="card-title">这个窗口</p>
-          <p style="margin:0;color:var(--text-2)">
+          <!-- 非 Windows 11 平台由 app.js applyPlatform 改写为对应描述 -->
+          <p id="winDesc" style="margin:0;color:var(--text-2)">
             <code>title-overlay</code> 边框样式（右上角控制按钮由库内置渲染）+
             <code>Mica</code> 材质 + 透明窗口。标题栏为页面自绘的拖拽区，
             主题与材质可在「外观」页实时切换。

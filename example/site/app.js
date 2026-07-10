@@ -132,6 +132,26 @@ function initSeg(root, onChange) {
   return { select };
 }
 
+/* ============ 运行环境（宿主经 "env" 通道下发，决定标题栏/材质适配） ============ */
+const ENV = { os: 'windows', arch: '', win11: true };   // 独立预览/旧宿主：按 Windows 全功能展示
+function applyPlatform() {
+  document.documentElement.dataset.os = ENV.os;         // CSS 据此隐藏自绘标题栏（Linux 用系统标题栏）
+  const hasBackdrop = ENV.os === 'windows' && ENV.win11;
+  if (hasBackdrop) return;
+  // 无 DWM 材质的平台：默认纯色背景，材质选项只留「纯色」
+  currentBackdrop = 'none';
+  document.querySelectorAll('#matList .mat').forEach(b => {
+    if (b.dataset.v !== 'none') { b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
+  });
+  const hint = document.querySelector('#matList + .hint');
+  if (hint) hint.textContent = ENV.os === 'windows'
+    ? '当前系统非 Windows 11，DWM 材质不可用，已改用纯色背景。'
+    : `当前平台 ${ENV.os}：无 DWM 材质，已改用纯色背景（set_window_background_color）。`;
+  const desc = $('#winDesc');
+  if (desc) desc.textContent =
+    `系统边框与标题栏（${ENV.os}）+ 纯色背景。DWM 材质与标题栏覆盖层为 Windows 专属，相关选项已停用。`;
+}
+
 /* ============ 主题（颜色模式） ============ */
 const mqDark = matchMedia('(prefers-color-scheme: dark)');
 let themeMode = 'system';
@@ -143,7 +163,7 @@ async function applyTheme() {
   if (!hasJade) return;
   const mode = { light: 'Light', dark: 'Dark', system: 'System' }[themeMode];
   await inv('set-theme', { mode }, true);
-  await inv('apply-titlebar', { dark }, true);        // 同步标题栏图标色
+  if (ENV.os === 'windows') await inv('apply-titlebar', { dark }, true);  // 标题栏覆盖层仅 Windows
   if (currentBackdrop === 'none') applyBackdrop('none', true);  // 纯色底随主题换色
 }
 mqDark.addEventListener('change', () => { if (themeMode === 'system') applyTheme(); });
@@ -231,9 +251,14 @@ addEventListener('focus', () => delete document.documentElement.dataset.inactive
 /* ============ 启动 ============ */
 moveIndicator(nav.querySelector('.nav-item.active'));
 if (hasJade) {
-  applyTheme();                     // System 模式：探测明暗并同步标题栏
-  loadOverview();
-  showToast({ level: 'success', title: '已就绪', message: 'jade 对象可用，IPC 通道已连通。' });
+  (async () => {
+    const env = await inv('env', {}, true);           // 先取平台再适配（失败则按默认 Windows 处理）
+    try { Object.assign(ENV, JSON.parse(env)); } catch { }
+    applyPlatform();
+    await applyTheme();             // System 模式：探测明暗；非 Win11 时顺带铺纯色背景
+    loadOverview();
+    showToast({ level: 'success', title: '已就绪', message: 'jade 对象可用，IPC 通道已连通。' });
+  })();
 } else {
   $('#titleSub').textContent = '独立预览（jade 不可用）';
   showToast({ level: 'warning', title: '独立预览', message: '未在 JadeView 内运行，仅可预览界面。', duration: 0 });

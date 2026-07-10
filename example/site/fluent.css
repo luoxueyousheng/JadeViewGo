@@ -105,6 +105,10 @@ body {
 html[data-inactive] .title-bar .app-name { color: var(--text-2); }   /* 非激活态变暗 */
 html[data-inactive] .title-bar .logo { filter: saturate(0.6); opacity: .7; }
 
+/* 非 Windows（app.js 按宿主 env 通道设置 data-os）：系统自带标题栏，隐藏自绘标题栏行 */
+html[data-os]:not([data-os="windows"]) .title-bar { display: none; }
+html[data-os]:not([data-os="windows"]) #app { grid-template-rows: 1fr; }
+
 .main { display: grid; grid-template-columns: auto 1fr; min-height: 0; }
 
 /* --- NavigationView（§9 / §11.7） --- */
@@ -241,6 +245,7 @@ textarea.input { height: auto; min-height: 64px; padding: 6px var(--sp-s); resiz
 .mat:hover { background: var(--fill-subtle); }
 .mat:active { background: var(--fill-secondary); }
 .mat[aria-pressed="true"] { border-color: var(--accent); background: var(--fill-secondary); }
+.mat:disabled { opacity: .45; pointer-events: none; }   /* 平台不支持的材质（非 Win11） */
 .mat .swatch {
   width: 48px; height: 32px; border-radius: 4px; flex: 0 0 auto;
   border: 1px solid var(--divider);
