@@ -180,16 +180,16 @@ go run ./example
 - **WebView 设置**:`DefaultWebViewSettings` 起步,用 `PreloadJS` 在页面脚本运行前注入
   平台信息(`window.__JV_ENV`),前端同步读取做平台适配(标题栏/材质),`env` IPC 通道兜底。
 
-**前端整目录内置,运行时零落盘**:`example/site/`(index.html + fluent.css + app.js)用
-`//go:embed all:site` 打成 `embed.FS` 编进 exe;运行时在 127.0.0.1 随机端口起进程内 HTTP
-服务直接以 `embed.FS` 为根对外服务(`http.FileServer(http.FS(...))`),窗口导航到
-`http://127.0.0.1:<port>/index.html`——**磁盘上不出现任何前端文件**,多文件/相对路径/子目录
-全部可用,加文件无需改 Go 代码。托盘图标同样走内存 API(`TraySetIconFromData`)。
+**前端站点加载(当前方案:库协议服务)**:示例把 `example/site/`(index.html + fluent.css +
+app.js)源码目录直接交给 `SetProtocolServicePath(dir, hotReload=true)`,返回的 URL 直接建窗
+导航;hotReload 下改动站点文件页面即时刷新,适合开发调试。**站点目录不要与 `Init` 的
+data_directory 相同或嵌套**——库持续写数据会触发「写→热载刷新」死循环。
 
-> 为什么不用库的协议服务?`SetProtocolServicePath` 只接受磁盘目录(库自己读文件),无法直接
-> 挂 `embed.FS`;要用它就得先把 embed 内容释放到临时目录(此方式的代码见 git 历史/文档,
-> 附带热载能力)。纯内存的官方替代是 JAPK 资源包(`LoadFromBytes`,需上游打包工具)。
+> 备用方案(代码保留于 `serveSite`,当前已屏蔽):`//go:embed all:site` 打成 `embed.FS`,
+> 运行时在 127.0.0.1 随机端口起进程内 HTTP 服务直出 embed.FS——**磁盘零前端文件**,不依赖
+> 源码目录,适合分发单 exe。纯内存官方替代是 JAPK 资源包(`LoadFromBytes`,需上游打包工具);
 > `data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航,窗口直接关闭)。
+> 托盘图标走内存 API(`TraySetIconFromData`,.ico 仅 Windows 传)。
 
 ## API 总览
 

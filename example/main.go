@@ -34,11 +34,11 @@ import (
 	jadeview "github.com/luoxueyousheng/JadeViewGo"
 )
 
-// 前端站点整目录内置（HTML/CSS/JS，含子目录）。运行时**不落盘**：
-// 库的协议服务(SetProtocolServicePath)只认磁盘路径、无法直接挂 embed.FS，
-// 故进程内起一个 127.0.0.1 回环 HTTP 服务，直接以 embed.FS 为文件系统对外服务——
-// 多文件/相对路径/子目录全部可用，新增文件无需改代码。
-// 托盘图标同样走内存 API（TraySetIconFromData）。
+// 前端站点（HTML/CSS/JS，含子目录）。
+// 当前启用方案：库内置协议服务 SetProtocolServicePath 直接挂 example/site 源码目录
+// （测试/开发用法，hotReload 下改页面文件即时刷新），返回的 URL 直接用于建窗导航。
+// 备用方案（已屏蔽，见 serveSite）：进程内 127.0.0.1 回环 HTTP 直出 embed.FS，
+// 零落盘、不依赖源码目录，适合分发单 exe——siteFS 即为此保留。
 // `all:` 前缀确保以 . 和 _ 开头的文件也被包含。
 //
 //go:embed all:site
@@ -61,8 +61,9 @@ var (
 func main() {
 	fmt.Printf("平台: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 
-	// 前端零落盘：页面走 data: URL、托盘图标走内存 API，见 buildDataURL/setupTray。
 	// dataDir 是库自身的运行时数据目录（WebView2 用户数据、YAML 存储），无法免除。
+	// 注意与协议服务挂的站点目录分开：库会持续往 dataDir 写数据，
+	// 若协议服务根目录与之相同/嵌套，热载监视会陷入「写→刷新」死循环。
 	dataDir = filepath.Join(os.TempDir(), "jadeview-demo", "data")
 	_ = os.MkdirAll(dataDir, 0o755)
 	// 开发模式下把库日志落盘，崩溃时（如 RUNTIME_PANIC）可直接查 panic 详情
@@ -125,13 +126,27 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Println("[app-ready] 初始化成功")
 
-	// 纯内存前端：回环 HTTP 服务直出 embed.FS，运行期不向磁盘释放任何前端文件
-	url, err := serveSite()
+	// 前端站点（当前启用）：协议服务直接挂 example/site 源码目录，返回的 URL 直接导航。
+	// hotReload=true：改动站点文件页面自动刷新（仅监视站点目录，勿指向 dataDir）。
+	siteDir, err := resolveSiteDir()
 	if err != nil {
-		fmt.Println("启动内置站点服务失败:", err)
+		fmt.Println("找不到前端站点目录:", err)
 		jadeview.Exit()
 		return ""
 	}
+	url, ok := jadeview.SetProtocolServicePath(siteDir, true)
+	if !ok {
+		fmt.Println("协议服务设置失败")
+		jadeview.Exit()
+		return ""
+	}
+	// 备用（已屏蔽）：进程内 127.0.0.1 HTTP 直出 embed.FS，零落盘。需要时换回：
+	// url, err := serveSite()
+	// if err != nil {
+	// 	fmt.Println("启动内置站点服务失败:", err)
+	// 	jadeview.Exit()
+	// 	return ""
+	// }
 	fmt.Println("[app-ready] 站点 URL:", url)
 
 	// 按平台建窗（前端经 PreloadJS 注入的 __JV_ENV 同步做界面适配，见 app.js applyPlatform）：
@@ -185,8 +200,19 @@ func onAppReady(windowID uint32, data string) string {
 	return ""
 }
 
-// serveSite 在 127.0.0.1 随机端口上起 HTTP 服务，直接以 go:embed 的 site/ 为根，
-// 返回入口 URL。前端文件全程只存在于 exe 内，磁盘上没有任何副本。
+// resolveSiteDir 定位 example/site 源码目录（按 go run ./example 与 example/ 内运行
+// 两种常见工作目录探测），返回绝对路径。协议服务只接受磁盘目录。
+func resolveSiteDir() (string, error) {
+	for _, dir := range []string{"example/site", "site"} {
+		if st, err := os.Stat(dir); err == nil && st.IsDir() {
+			return filepath.Abs(dir)
+		}
+	}
+	return "", fmt.Errorf("未找到 example/site（请在模块根目录用 go run ./example 运行）")
+}
+
+// serveSite（备用方案，当前已屏蔽）在 127.0.0.1 随机端口上起 HTTP 服务，直接以
+// go:embed 的 site/ 为根，返回入口 URL。前端文件全程只存在于 exe 内，磁盘零副本。
 // 仅监听回环地址；生产环境若担心本机其它进程访问，可在 Handler 外再校验随机 token。
 func serveSite() (string, error) {
 	sub, err := fs.Sub(siteFS, "site")
