@@ -130,7 +130,7 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Println("[app-ready] 站点 URL:", url)
 
-	// title-overlay 内置窗口控制按钮 + 透明窗口 + Mica 材质
+	// 按 DESIGN.md（Fluent 2）建窗：title-overlay 内置窗口控制按钮 + 透明窗口 + Mica 材质
 	opts := jadeview.DefaultWindowOptions()
 	opts.Title = "JadeView Go Demo (" + runtime.GOOS + "/" + runtime.GOARCH + ")"
 	opts.Width = 1000
@@ -215,13 +215,19 @@ func setupTray() {
 
 func onTrayMenuCommand(_ uint32, data string) string {
 	fmt.Printf("[事件] tray-menu-command: %s\n", data)
+	// 载荷为 JSON，优先取被点菜单项的 key 精确匹配；
+	// 库未按 {"key":...} 回报时退回对原始载荷的子串匹配兜底。
+	key := jsonStr(data, "key")
+	if key == "" {
+		key = data
+	}
 	switch {
-	case strings.Contains(data, "show"):
+	case strings.Contains(key, "show"):
 		jadeview.SetVisible(mainWindowID, true)
 		jadeview.SetFocus(mainWindowID)
-	case strings.Contains(data, "hide"):
+	case strings.Contains(key, "hide"):
 		jadeview.SetVisible(mainWindowID, false)
-	case strings.Contains(data, "quit"):
+	case strings.Contains(key, "quit"):
 		jadeview.Exit()
 	}
 	return ""

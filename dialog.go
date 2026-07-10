@@ -58,11 +58,8 @@ func ShowSaveDialog(p FileDialogParams) string {
 
 // --- 消息框 ---
 
-// ShowMessageBox 显示消息框，返回结果 JSON（含点击的按钮索引）。
-func ShowMessageBox(p MessageBoxParams) string {
-	pool := &cstrPool{}
-	defer pool.free()
-	c := C.MessageBoxParams{
+func (p *MessageBoxParams) toC(pool *cstrPool) C.MessageBoxParams {
+	return C.MessageBoxParams{
 		window_id:  C.uint32_t(p.WindowID),
 		title:      pool.s(p.Title),
 		message:    pool.s(p.Message),
@@ -72,6 +69,13 @@ func ShowMessageBox(p MessageBoxParams) string {
 		cancel_id:  C.int32_t(p.CancelID),
 		type_:      pool.s(p.Type),
 	}
+}
+
+// ShowMessageBox 显示消息框，返回结果 JSON（含点击的按钮索引）。
+func ShowMessageBox(p MessageBoxParams) string {
+	pool := &cstrPool{}
+	defer pool.free()
+	c := p.toC(pool)
 	return goStringFree(C.jade_dialog_show_message_box(&c))
 }
 

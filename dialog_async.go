@@ -110,16 +110,7 @@ func ShowMessageBoxAsync(p MessageBoxParams, handler DialogResultHandler) bool {
 	}
 	pool := &cstrPool{}
 	defer pool.free()
-	c := C.MessageBoxParams{
-		window_id:  C.uint32_t(p.WindowID),
-		title:      pool.s(p.Title),
-		message:    pool.s(p.Message),
-		detail:     pool.s(p.Detail),
-		buttons:    pool.s(p.Buttons),
-		default_id: C.int32_t(p.DefaultID),
-		cancel_id:  C.int32_t(p.CancelID),
-		type_:      pool.s(p.Type),
-	}
+	c := p.toC(pool)
 	if C.jade_dialog_show_message_box_async(&c, C.jv_dlg_get_tramp(slot)) != 1 {
 		dlgRelease(slot)
 		return false

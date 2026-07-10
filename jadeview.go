@@ -63,6 +63,10 @@ func Version() string {
 	return cBufToString(buf)
 }
 
+// Preload 与 Windows 版对齐的占位实现：Linux 侧 libJadeView.a 为静态链接，
+// 无运行时加载步骤，恒返回 nil。跨平台代码可无条件调用。
+func Preload() error { return nil }
+
 // RunMessageLoop 运行消息循环（阻塞，直到窗口全部关闭/退出）。
 func RunMessageLoop() {
 	C.run_message_loop()

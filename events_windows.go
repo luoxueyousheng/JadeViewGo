@@ -58,7 +58,7 @@ func goEventDispatch(slot int, windowID, data uintptr) uintptr {
 }
 
 // On 注册事件处理器，返回库分配的 callback_id（配合 Off 注销）。
-// 第二个返回值为 false 表示槽位已满（超过 MaxEventHandlers）。
+// 第二个返回值为 false 表示槽位已满（超过 MaxEventHandlers）或库注册失败。
 func On(event string, handler EventHandler) (uint32, bool) {
 	evMu.Lock()
 	slot := -1
@@ -82,6 +82,12 @@ func On(event string, handler EventHandler) (uint32, bool) {
 	runtime.KeepAlive(pool)
 	cbID := uint32(r)
 	evMu.Lock()
+	if cbID == 0 {
+		// 库注册失败（callback_id 与 window_id/tray_id 同约定：0=失败），回收槽位
+		evSlots[slot] = nil
+		evMu.Unlock()
+		return 0, false
+	}
 	reg.cbID = cbID // 锁内赋值，避免与 Off 的读取竞态
 	evMu.Unlock()
 	return cbID, true

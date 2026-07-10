@@ -70,7 +70,8 @@ func IsWindows11() bool {
 }
 
 // GetPrinterList 返回打印机名称 JSON 数组和打印机数量。
-// 注意：jade_get_printer_list 返回的是打印机数量（非 1=成功），不能走 bufCallInt。
+// 注意：jade_get_printer_list 返回的是打印机数量（非 1=成功），不能走 bufCallInt；
+// 头文件未定义缓冲不足时的行为（16KB 对打印机名列表实际足够）。
 func GetPrinterList() (string, int32, bool) {
 	buf := make([]byte, 16384)
 	rc := C.jade_get_printer_list((*C.char)(unsafe.Pointer(&buf[0])), C.int32_t(len(buf)))

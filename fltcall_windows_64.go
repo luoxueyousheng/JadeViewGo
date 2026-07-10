@@ -65,7 +65,7 @@ var fltStubOnce = sync.OnceValues(func() (uintptr, error) {
 
 // callF64I32 调用签名为 int32(uint32, double) 的导出函数。
 // 跳板约定：arg1=id（原位透传）、arg2=double 位模式、arg3=目标函数地址。
-func callF64I32(p *syscall.LazyProc, id uint32, f float64) int32 {
+func callF64I32(p *jvProc, id uint32, f float64) int32 {
 	stub, err := fltStubOnce()
 	if err != nil {
 		return 0

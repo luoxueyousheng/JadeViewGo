@@ -21,9 +21,9 @@ func goStringFree(c *C.char) string {
 }
 
 // bufCallSize 调用「填充缓冲区、size_t 长度、返回 1=成功」类函数。
-// 缓冲区不足时（库返回 0）自动放大重试一次。
+// 缓冲区不足时（库返回 0）按 16×/256× 放大重试两次（覆盖超长 URL 等场景）。
 func bufCallSize(initial int, fn func(buf *C.char, n C.size_t) C.int32_t) (string, bool) {
-	for _, size := range []int{initial, initial * 16} {
+	for _, size := range []int{initial, initial * 16, initial * 256} {
 		buf := make([]byte, size)
 		if fn((*C.char)(unsafe.Pointer(&buf[0])), C.size_t(size)) == 1 {
 			return cBufToString(buf), true
@@ -34,7 +34,7 @@ func bufCallSize(initial int, fn func(buf *C.char, n C.size_t) C.int32_t) (strin
 
 // bufCallInt 同 bufCallSize，但长度参数为 int32。
 func bufCallInt(initial int, fn func(buf *C.char, n C.int32_t) C.int32_t) (string, bool) {
-	for _, size := range []int{initial, initial * 16} {
+	for _, size := range []int{initial, initial * 16, initial * 256} {
 		buf := make([]byte, size)
 		if fn((*C.char)(unsafe.Pointer(&buf[0])), C.int32_t(size)) == 1 {
 			return cBufToString(buf), true

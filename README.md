@@ -29,18 +29,18 @@
 
 ```bash
 go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
-go get github.com/luoxueyousheng/JadeViewGo@v0.1.1    # 锁定指定版本
+go get github.com/luoxueyousheng/JadeViewGo@v0.2.0    # 锁定指定版本
 ```
 
 只想先跑一眼内置示例(示例是模块子包,可直接运行):
 
 ```bash
-go run github.com/luoxueyousheng/JadeViewGo/example@v0.1.1
+go run github.com/luoxueyousheng/JadeViewGo/example@v0.2.0
 ```
 
 > - 依赖拉下来后,**构建仍需满足对应平台的前置条件**(下一节);Linux 尤其别漏系统开发包。
 > - 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
->   `@v0.1.1`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
+>   `@v0.2.0`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
 
 ## 平台前置条件与上手
 
@@ -196,7 +196,7 @@ Linux 实现是不带后缀的 cgo 文件(`//go:build linux`)。
 
 | 模块 | 主要函数 |
 |------|----------|
-| 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` |
+| 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` / `Preload`（Windows 提前加载 DLL 并拿到错误;Linux 恒 nil） |
 | 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`）、`CreateBorderlessWindow`、`Navigate`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
 | 窗口扩展 | 状态查询 `Is*`、`GetWindowBounds`、`GetWindowHWND`⇄`GetWindowID`、层级/背景/全屏/主题/缩放、DevTools、`SendIPCMessage`、任务栏进度/闪烁 |
 | 事件桥 | `On` / `Off` / `RegisterIPCHandler`（槽位池,上限 `MaxEventHandlers`=64） |
@@ -249,10 +249,13 @@ JadeView/
 ## Windows 纯 Go 实现原理
 
 1. **内置与释放**:`dll_embed_windows_*.go` 按架构 go:embed 对应的 `JadeView.dll`;
-   包初始化时释放到 `%TEMP%\jadeview\<架构>-<内容哈希前8位>\`(内容寻址:换版本换目录,
-   无需比对/覆盖旧文件,多进程多版本并存安全)。exe 同目录的 `JadeView.dll` 优先。
+   **首次调用任一 API(或 `Preload`)时**才释放到 `%TEMP%\jadeview\<架构>-<内容哈希前8位>\`
+   (内容寻址:换版本换目录,已存在文件按完整 sha256 校验、不符重写,多进程多版本并存安全;
+   仅 import 本包无任何磁盘副作用)。exe 同目录的 `JadeView.dll` 优先。
 2. **加载与调用**:`syscall.NewLazyDLL` 按绝对路径惰性加载;全部 124 个导出函数经
-   `LazyProc.Call` 直调(`dll_windows.go` 内含完整地址表)。
+   惰性代理 `jvProc.Call` 直调(`dll_windows.go` 内含完整地址表)。**加载失败时首次 API
+   调用会 panic**(`syscall.LazyProc` 语义)——需优雅降级的宿主在启动早期调 `Preload()`
+   检查错误即可。
 3. **结构体传参**:`WebViewWindowOptions` 等 6 个 C 结构体在 Go 侧逐字段镜像
    (`window_windows.go` 等),布局已用 C `offsetof` 与 Go `unsafe.Offsetof`
    双端逐字段比对验证(amd64/386;arm64 与 amd64 对齐规则相同)。
@@ -287,7 +290,10 @@ JadeView/
 - **`app-ready` 之后再调持久化 API**:YAML 等依赖 `Init` 的 `data_directory` 就绪。
 - **`app_signature` 至少 6 个字符**,过短 `Init` 返回失败且不启动 GUI 线程。
 - **Windows 杀软告警**:个别杀软对「释放 DLL 并加载」或浮点跳板的可执行内存分配有
-  启发式告警,属正常;可引导用户加白。
+  启发式告警,属正常;可引导用户加白。若 DLL 释放/加载被拦截,首次 API 调用会 panic——
+  用 `Preload()` 在启动早期探测并优雅提示。
+- **事件槽位上限**:`On` 与 `RegisterIPCHandler` **共享** `MaxEventHandlers`=64 个槽位;
+  IPC handler 无注销 API(上游头文件亦无),注册后**永久占用**一个槽位,规划通道数量时留意。
 - **Linux 托盘**:依赖桌面环境(appindicator 等)支持,无托盘协议的环境创建会失败,代码已容错跳过。
 - **`jade-region-drag` 拖动区为 Windows 特性**(上游文档标注),Linux 请用 CSS `-webkit-app-region: drag`。
 - **`lib/` 下的二进制**是 JadeView 作者的第三方产物,**不在本项目 MIT 许可范围内**。
