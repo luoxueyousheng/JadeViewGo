@@ -136,7 +136,7 @@ func onAppReady(windowID uint32, data string) string {
 
 	// 前端加载方式（三选一）：
 	//   0 = JAPK 资源包：go:embed 的 app.japk 内存加载（未设公钥=混淆包 JPKBIN02），
-	//       再以特殊路径 "japk" 调 SetProtocolServicePath——协议服务转为内存 JAPK 模式；
+	//       再以空路径调 SetProtocolServicePath——协议服务转为内存 JAPK 模式；
 	//   1 = 协议服务挂 example/site 源码目录（hotReload：改页面文件即时刷新，适合开发调试）；
 	//   2 = 进程内 127.0.0.1 HTTP 直出 embed.FS（零落盘，适合分发单 exe）。
 	// 三种方式返回的 URL 都直接用于建窗导航（JAPK 模式形如 JADE://<app_signature>）。
@@ -150,7 +150,7 @@ func onAppReady(windowID uint32, data string) string {
 			jadeview.Exit()
 			return ""
 		}
-		u, ok := jadeview.SetProtocolServicePath("japk", false) // "japk"=服务 LoadFromBytes 加载的内存资源包
+		u, ok := jadeview.SetProtocolServicePath("", false) // 空路径=服务 LoadFromBytes 加载的内存资源包
 		if !ok {
 			fmt.Println("协议服务(JAPK 模式)设置失败")
 			jadeview.Exit()

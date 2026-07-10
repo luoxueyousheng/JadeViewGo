@@ -184,7 +184,7 @@ go run ./example
 
 | plan | 方式 | 适用场景 |
 |------|------|----------|
-| 0(默认) | **JAPK 资源包**:`go:embed` 的 `app.japk` 经 `LoadFromBytes` 内存加载,再以特殊路径 `"japk"` 调 `SetProtocolServicePath` 切到内存 JAPK 模式,URL 形如 `JADE://<app_signature>` | 加密/混淆分发 |
+| 0(默认) | **JAPK 资源包**:`go:embed` 的 `app.japk` 经 `LoadFromBytes` 内存加载,再以**空路径**调 `SetProtocolServicePath("", false)` 切到内存 JAPK 模式,URL 形如 `JADE://<app_signature>` | 加密/混淆分发 |
 | 1 | **协议服务挂源码目录**:`SetProtocolServicePath("example/site", hotReload=true)`,改动站点文件页面即时刷新 | 开发调试 |
 | 2 | **进程内回环 HTTP**:127.0.0.1 随机端口直出 `embed.FS`,磁盘零前端文件 | 单 exe 分发(不想用 JAPK 时) |
 

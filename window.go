@@ -22,6 +22,12 @@ func (p *cstrPool) s(str string) *C.char {
 	if str == "" {
 		return nil
 	}
+	return p.sAlways(str)
+}
+
+// sAlways 同 s，但空字符串也返回指向 "\0" 的有效指针。个别 API 区分 NULL 与空串
+// （如 set_protocol_service_path：空串=内存 JAPK 模式，NULL 被拒绝）。
+func (p *cstrPool) sAlways(str string) *C.char {
 	c := C.CString(str)
 	p.ptrs = append(p.ptrs, unsafe.Pointer(c))
 	return c

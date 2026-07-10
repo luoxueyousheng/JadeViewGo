@@ -225,11 +225,13 @@ func GetFileIcon(path string, size int, windowID, ttlSeconds uint32) (string, bo
 // rootPath 三种取值（beta.10 实测）：
 //   - 磁盘目录路径：文件系统模式，服务该目录（hotReload 仅此模式有效，改文件即时刷新页面）；
 //   - .japk 文件路径：挂载磁盘上的 JAPK 资源包；
-//   - 特殊值 "japk"：内存模式，服务 LoadFromBytes 已加载的资源包
-//     （须先加载成功，返回 URL 形如 JADE://<app_signature>）。
+//   - 空字符串 ""：内存模式，服务 LoadFromBytes 已加载的资源包
+//     （须先加载成功，返回 URL 形如 JADE://<app_signature>；字面量 "japk" 同效）。
+//
+// 本函数对空串传有效空 C 字符串而非 NULL（NULL 会被库以 Invalid root path 拒绝）。
 func SetProtocolServicePath(rootPath string, hotReload bool) (string, bool) {
 	pool := &cstrs{}
-	cr := pool.p(rootPath)
+	cr := pool.pAlways(rootPath)
 	s, ok := bufCallSize(512, func(buf unsafe.Pointer, size uintptr) int32 {
 		r, _, _ := procSetProtocolSvcPath.Call(uintptr(unsafe.Pointer(cr)), uintptr(buf), size, b2u(hotReload))
 		return i32(r)
