@@ -100,6 +100,13 @@ func main() {
 		}
 		return ""
 	})
+	jadeview.On(jadeview.EventWindowStateChanged, func(id uint32, data string) string {
+		// 转发给前端：Linux 自绘窗口据此切换 最大化/还原 图标、去掉圆角阴影贴边显示
+		if mainWindowID != 0 && id == mainWindowID {
+			jadeview.SendIPCMessage(mainWindowID, "window-state-changed", data)
+		}
+		return ""
+	})
 	jadeview.On(jadeview.EventDragDrop, onDragDrop)
 	jadeview.On(jadeview.EventTrayMenuCommand, onTrayMenuCommand)
 	jadeview.On(jadeview.EventTrayEvent, func(_ uint32, data string) string {
@@ -192,7 +199,9 @@ func onAppReady(windowID uint32, data string) string {
 	// 按平台建窗（前端经 PreloadJS 注入的 __JV_ENV 同步做界面适配，见 app.js applyPlatform）：
 	//   Windows 11 : title-overlay（库内置右上角控制按钮）+ 透明窗口 + Mica 材质（Fluent 2 推荐组合）
 	//   Windows 10 : title-overlay 可用，但无 DWM 材质——不开透明，用纯色背景
-	//   Linux      : title-overlay 同样可用（真机验证）；无 DWM 材质，不透明窗口、纯色背景
+	//   Linux      : no-titlebar + 透明窗口，圆角/阴影/控制按钮全部由前端自绘
+	//                （title-overlay 也可用，但覆盖层样式上游暂不支持运行时定制、
+	//                深色主题下固定深灰图标不可见，故整体改为自绘方案，随主题换色）
 	win11 := runtime.GOOS == "windows" && jadeview.IsWindows11()
 	opts := jadeview.DefaultWindowOptions()
 	opts.Title = "JadeView Go Demo (" + runtime.GOOS + "/" + runtime.GOARCH + ")"
@@ -200,11 +209,17 @@ func onAppReady(windowID uint32, data string) string {
 	opts.Height = 720
 	opts.MinWidth = 640
 	opts.MinHeight = 480
-	opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮（两端可用）
+	if runtime.GOOS == "windows" {
+		opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮（可随主题定制）
+	} else {
+		opts.FrameStyle = jadeview.FrameStyle.NoTitlebar // 保留边框 + 无标题栏，控制按钮由前端自绘
+	}
 	if win11 {
 		opts.Transparent = true // 配合 Mica 材质
+	} else if runtime.GOOS == "windows" {
+		opts.BackgroundColor = "#F3F3F3FF" // Win10：无 DWM 材质，先给初始纯色，前端随明暗主题再覆盖
 	} else {
-		opts.BackgroundColor = "#F3F3F3FF" // 无 DWM 材质的平台先给初始纯色，前端随明暗主题再覆盖
+		opts.Transparent = true // Linux：透明窗口，圆角/阴影/纯色底由前端自绘（fluent.css）
 	}
 	opts.Theme = jadeview.Theme.System
 	opts.AutoSaveState = true
@@ -227,13 +242,15 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Printf("[app-ready] 窗口创建成功 id=%d\n", mainWindowID)
 
-	// Mica 材质仅 Win11；标题栏覆盖层（高 40，与页面 .title-bar / #app 网格行高一致）两端可用。
+	// Mica 材质仅 Win11；标题栏覆盖层仅 Windows（高 40，与页面 .title-bar / #app 网格行高一致）。
 	// 图标色初始按浅色主题给，前端探测到实际明暗后经 apply-titlebar 通道再同步。
 	// 非 Win11 平台的纯色背景由前端启动时经 set-backdrop(none) 随明暗主题设置。
 	if win11 {
 		jadeview.SetBackdrop(mainWindowID, jadeview.Backdrop.Mica)
 	}
-	jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
+	if runtime.GOOS == "windows" {
+		jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
+	}
 
 	setupTray()
 	return ""
@@ -391,8 +408,13 @@ func registerIPCHandlers() {
 		return fmt.Sprintf("set_window_theme(%s): %v", mode, ok)
 	})
 
-	// 同步标题栏覆盖层图标色：payload {"dark":true|false}（仅样式，按钮功能库内置；两端可用）
+	// 同步标题栏覆盖层图标色：payload {"dark":true|false}（仅样式，按钮功能库内置）。
+	// 覆盖层运行时定制为 Windows 专属（上游限制）；非 Windows 无覆盖层，
+	// 控制按钮由前端自绘（用 CSS 变量随主题换色，无需宿主参与）。
 	jadeview.RegisterIPCHandler("apply-titlebar", func(wid uint32, data string) string {
+		if runtime.GOOS != "windows" {
+			return "标题栏: 前端自绘控制按钮（随主题自动换色，无需覆盖层）"
+		}
 		if strings.Contains(data, "true") {
 			jadeview.SetTitlebarOverlayStyle(wid, titlebarHeight, "#FFFFFF", "#3A3A3A")
 			return "标题栏: 深色图标方案"
@@ -570,6 +592,15 @@ func registerIPCHandlers() {
 	jadeview.RegisterIPCHandler("minimize", func(wid uint32, _ string) string {
 		jadeview.Minimize(wid)
 		return "已最小化"
+	})
+	// maximize / close 供前端自绘控制按钮调用（非 Windows 的 no-titlebar 窗口）
+	jadeview.RegisterIPCHandler("maximize", func(wid uint32, _ string) string {
+		jadeview.ToggleMaximize(wid)
+		return fmt.Sprintf("最大化切换，当前: %v", jadeview.IsMaximized(wid))
+	})
+	jadeview.RegisterIPCHandler("close", func(wid uint32, _ string) string {
+		jadeview.Close(wid)
+		return "关闭请求已发出"
 	})
 	jadeview.RegisterIPCHandler("bounds", func(wid uint32, _ string) string {
 		v, _ := jadeview.GetWindowBounds(wid)

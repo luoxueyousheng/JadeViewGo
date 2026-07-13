@@ -29,18 +29,18 @@
 
 ```bash
 go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
-go get github.com/luoxueyousheng/JadeViewGo@v0.2.2    # 锁定指定版本
+go get github.com/luoxueyousheng/JadeViewGo@v0.2.3    # 锁定指定版本
 ```
 
 只想先跑一眼内置示例(示例是模块子包,可直接运行):
 
 ```bash
-go run github.com/luoxueyousheng/JadeViewGo/example@v0.2.2
+go run github.com/luoxueyousheng/JadeViewGo/example@v0.2.3
 ```
 
 > - 依赖拉下来后,**构建仍需满足对应平台的前置条件**(下一节);Linux 尤其别漏系统开发包。
 > - 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
->   `@v0.2.2`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
+>   `@v0.2.3`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
 
 ## 平台前置条件与上手
 

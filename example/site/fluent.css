@@ -111,6 +111,57 @@ html[data-inactive] .title-bar .logo { filter: saturate(0.6); opacity: .7; }
    （两套方式可共存互不影响，Windows 上仍以 HTML 属性为准） */
 html[data-os]:not([data-os="windows"]) .title-bar { app-region: drag; -webkit-app-region: drag; }
 
+/* --- 自绘窗口控制按钮（仅非 Windows 显示） ---
+   Linux 用 no-titlebar 边框：库不渲染内置按钮（title-overlay 的覆盖层样式
+   上游暂不支持运行时定制，深色下固定深灰图标不可见），改由页面自绘，
+   颜色走 CSS 变量随主题自动切换；点击经 IPC 调 minimize/maximize/close */
+.title-bar .caption { display: none; margin-left: auto; align-self: stretch; }
+html[data-os]:not([data-os="windows"]) .title-bar { padding-right: 0; }
+html[data-os]:not([data-os="windows"]) .title-bar .caption {
+  display: flex; app-region: no-drag; -webkit-app-region: no-drag;
+}
+.cap-btn {
+  width: 46px; height: 100%; padding: 0; border: none; border-radius: 0;
+  background: transparent; color: var(--text-2); cursor: default;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 100ms var(--fluent-standard), color 100ms var(--fluent-standard);
+}
+.cap-btn:hover { background: var(--fill-secondary); color: var(--text-1); }
+.cap-btn:active { opacity: .7; }
+.cap-btn.cap-close:hover { background: #E81123; color: #FFFFFF; }
+.cap-btn.cap-close:active { background: #C42B1C; color: #FFFFFF; opacity: 1; }
+
+/* --- Linux：透明窗口 + 自绘圆角与阴影 ---
+   no-titlebar/透明窗口无系统装饰，页面在四周留透明边距给阴影，
+   #app 作为圆角壳承载实际界面；最大化时（data-maximized）贴边、去圆角阴影 */
+:root[data-os="linux"] body { background: transparent; }
+html[data-os="linux"] #app {
+  margin: 14px; height: calc(100% - 28px);
+  border-radius: 12px; overflow: hidden;
+  /* 顶部微弱提亮渐变叠在纯色底上，模拟受光面 */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.015), transparent 140px),
+    var(--bg-solid);
+  border: 1px solid var(--stroke);
+  /* 微光描边（深色下勾出轮廓）+ 两层近身低浓度阴影，渐隐收在边距内不被硬切 */
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.02),
+    0 2px 4px rgba(0,0,0,0.10),
+    0 4px 10px rgba(0,0,0,0.16);
+  transition: background 320ms ease, border-color 320ms ease, box-shadow 320ms ease;
+}
+html[data-os="linux"][data-inactive] #app {   /* 失焦时阴影收敛（Fluent 惯例） */
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.02),
+    0 1px 2px rgba(0,0,0,0.08),
+    0 2px 6px rgba(0,0,0,0.10);
+}
+html[data-os="linux"][data-maximized] #app {
+  margin: 0; height: 100%;
+  border-radius: 0; border: none; box-shadow: none;
+}
+html[data-os="linux"] #toasts { right: 26px; bottom: 26px; } /* 阴影边距内缩 */
+
 .main { display: grid; grid-template-columns: auto 1fr; min-height: 0; }
 
 /* --- NavigationView（§9 / §11.7） --- */

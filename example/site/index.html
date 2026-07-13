@@ -19,6 +19,9 @@
     <g id="i-chip"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/><path d="M6.5 4.5 V2 M9.5 4.5 V2 M6.5 14 V11.5 M9.5 14 V11.5 M4.5 6.5 H2 M4.5 9.5 H2 M14 6.5 H11.5 M14 9.5 H11.5"/></g>
     <g id="i-db"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5 V12.5 C2.5 13.6 5 14.5 8 14.5 C11 14.5 13.5 13.6 13.5 12.5 V3.5 M2.5 8 C2.5 9.1 5 10 8 10 C11 10 13.5 9.1 13.5 8"/></g>
     <g id="i-drop"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke-dasharray="2.4 1.8"/><path d="M8 5.5 V10.5 M5.8 8.5 L8 10.5 L10.2 8.5"/></g>
+    <g id="i-min"><path d="M3.5 8 H12.5"/></g>
+    <g id="i-max"><rect x="4" y="4" width="8" height="8" rx="1"/></g>
+    <g id="i-restore"><rect x="3.5" y="5.5" width="7" height="7" rx="1"/><path d="M5.5 5.5 V5 A1.5 1.5 0 0 1 7 3.5 H11 A1.5 1.5 0 0 1 12.5 5 V9 A1.5 1.5 0 0 1 11 10.5 H10.5"/></g>
     <g id="i-close"><path d="M4 4 L12 12 M12 4 L4 12"/></g>
     <g id="i-info"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.5 V11 M8 5.2 V5.4"/></g>
     <g id="i-check"><circle cx="8" cy="8" r="6.25"/><path d="M5 8.2 L7.2 10.4 L11 6"/></g>
@@ -35,6 +38,18 @@
     <svg class="icon logo" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><use href="#i-logo"/></svg>
     <span class="app-name">JadeView Go Demo</span>
     <span class="app-sub" id="titleSub">Fluent Design · 纯 Go 绑定</span>
+    <!-- 自绘窗口控制按钮：仅非 Windows 显示（no-titlebar 无库内置按钮），随主题换色 -->
+    <div class="caption" jade-region-no-drag>
+      <button class="cap-btn" id="capMin" title="最小化" aria-label="最小化">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><use href="#i-min"/></svg>
+      </button>
+      <button class="cap-btn" id="capMax" title="最大化/还原" aria-label="最大化或还原">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><use href="#i-max"/></svg>
+      </button>
+      <button class="cap-btn cap-close" id="capClose" title="关闭" aria-label="关闭">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><use href="#i-close"/></svg>
+      </button>
+    </div>
   </header>
 
   <div class="main">

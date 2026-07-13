@@ -150,11 +150,11 @@ function applyPlatform() {
   const hint = document.querySelector('#matList + .hint');
   if (hint) hint.textContent = ENV.os === 'windows'
     ? '当前系统非 Windows 11，DWM 材质不可用，已改用纯色背景。'
-    : `当前平台 ${ENV.os}：无 DWM 材质，已改用纯色背景（set_window_background_color）。`;
+    : `当前平台 ${ENV.os}：无 DWM 材质，纯色底由页面圆角壳自绘（透明窗口），随明暗主题换色。`;
   const desc = $('#winDesc');
   if (desc) desc.textContent = ENV.os === 'windows'
     ? 'title-overlay 边框（右上角控制按钮库内置）+ 纯色背景。当前非 Windows 11，Mica/Acrylic 材质不可用，相关选项已停用。'
-    : `title-overlay 边框（右上角控制按钮库内置，${ENV.os}）+ 纯色背景。DWM 材质为 Windows 11 专属，相关选项已停用。`;
+    : `no-titlebar + 透明窗口（${ENV.os}）：圆角、阴影与右上角控制按钮均由前端自绘，随主题换色。DWM 材质为 Windows 11 专属，相关选项已停用。`;
 }
 
 /* ============ 主题（颜色模式） ============ */
@@ -183,6 +183,9 @@ async function applyBackdrop(type, silent = false) {
   document.documentElement.dataset.backdrop = type;
   document.querySelectorAll('#matList .mat')
     .forEach(b => b.setAttribute('aria-pressed', b.dataset.v === type ? 'true' : 'false'));
+  // Linux 是透明窗口：纯色底由页面圆角壳自绘（fluent.css #app 背景随主题换色），
+  // 不能设窗口背景色——否则会盖掉透明边距，圆角和阴影就没了
+  if (ENV.os !== 'windows') return;
   const payload = { type };
   if (type === 'none') payload.color = effectiveDark() ? '#202020FF' : '#F3F3F3FF';
   await inv('set-backdrop', payload, silent);
@@ -216,7 +219,21 @@ if (hasJade) {
   jade.on('drag-drop', p => {
     try { onDragEvent(typeof p === 'string' ? JSON.parse(p) : p); } catch { }
   });
+  jade.on('window-state-changed', p => {
+    try {
+      const d = typeof p === 'string' ? JSON.parse(p) : p;
+      // 自绘控制按钮切换 最大化/还原 图标；圆角壳贴边/还原（fluent.css data-maximized）
+      $('#capMax use').setAttribute('href', d.isMaximized ? '#i-restore' : '#i-max');
+      if (d.isMaximized) document.documentElement.dataset.maximized = '';
+      else delete document.documentElement.dataset.maximized;
+    } catch { }
+  });
 }
+
+/* ============ 自绘窗口控制按钮（非 Windows，见 index.html .caption） ============ */
+$('#capMin').onclick   = () => inv('minimize', {}, true);
+$('#capMax').onclick   = () => inv('maximize', {}, true);
+$('#capClose').onclick = () => inv('close', {}, true);
 
 /* ============ 拖拽页 ============
  * 宿主注册 drag-drop 后接管拖拽，页面收不到原生 DOM drop 事件——
