@@ -64,8 +64,8 @@ async function inv(channel, payload = {}, silent = false) {
   }
 }
 
-function ipcLog(msg, ok = false) {
-  const el = $('#ipcLog');
+function logLine(sel, msg, ok = false) {
+  const el = $(sel);
   const t = new Date().toLocaleTimeString();
   const line = document.createElement('div');
   line.innerHTML = `<span class="t">[${t}]</span> <span class="${ok ? 'ok' : ''}"></span>`;
@@ -73,6 +73,8 @@ function ipcLog(msg, ok = false) {
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
 }
+const ipcLog  = (msg, ok = false) => logLine('#ipcLog', msg, ok);
+const dragLog = (msg, ok = false) => logLine('#dragLog', msg, ok);
 
 /* ============ NavigationView：共享指示条滑动（§11.7.1） ============ */
 const nav = $('#nav'), navInd = $('#navInd');
@@ -211,7 +213,58 @@ if (hasJade) {
     ipcLog(`← 宿主推送 dialog-result: ${s}`, true);
     showToast({ level: 'info', title: '对话框结果', message: s });
   });
+  jade.on('drag-drop', p => {
+    try { onDragEvent(typeof p === 'string' ? JSON.parse(p) : p); } catch { }
+  });
 }
+
+/* ============ 拖拽页 ============
+ * 宿主注册 drag-drop 后接管拖拽，页面收不到原生 DOM drop 事件——
+ * dropzone 的状态完全由 Go 经 IPC 转发的 enter/over/drop/leave 驱动。 */
+function onDragEvent(d) {
+  const dz = $('#dropzone'), n = (d.paths || []).length;
+  switch (d.type) {
+    case 'enter':
+      if ($('#swReject').checked) {          // Go 侧已在 enter 里同步拒绝，这里只做视觉反馈
+        dz.classList.add('deny');
+        dragLog(`enter (${d.x}, ${d.y}) ${n} 项 → 已被同步拦截拒绝`);
+        setTimeout(() => dz.classList.remove('deny'), 900);
+      } else {
+        dz.classList.add('over');
+        dragLog(`enter (${d.x}, ${d.y}) ${n} 项`, true);
+      }
+      break;
+    case 'over':                             // 高频事件：只刷新坐标行，不进日志
+      $('#dzStatus').textContent = `over (${d.x}, ${d.y})`;
+      break;
+    case 'drop': {
+      dz.classList.remove('over');
+      $('#dzStatus').textContent = `drop (${d.x}, ${d.y})，共 ${n} 项`;
+      dragLog(`drop (${d.x}, ${d.y}) ${n} 项`, true);
+      const list = $('#dropFiles');
+      list.replaceChildren(...(d.paths || []).map(p => {
+        const li = document.createElement('li');
+        const name = p.split(/[\\/]/).pop();
+        li.innerHTML = '<b></b><span></span>';
+        li.firstElementChild.textContent = name;
+        li.lastElementChild.textContent = p;
+        return li;
+      }));
+      showToast({ level: 'success', title: '文件已放下', message: `${n} 项，路径见「拖拽」页列表。` });
+      break;
+    }
+    case 'leave':
+      dz.classList.remove('over');
+      $('#dzStatus').textContent = '拖拽已离开窗口';
+      dragLog('leave');
+      break;
+  }
+}
+$('#swReject').addEventListener('change', e => inv('drag-reject', { on: e.target.checked }, false));
+$('#btnNoDrag').onclick = () => showToast({
+  level: 'info', title: 'jade-region-no-drag',
+  message: '这个按钮在拖动区内被挖洞排除，可正常点击、不触发拖动。',
+});
 
 /* ============ 通用按钮绑定 ============ */
 document.querySelectorAll('[data-inv]').forEach(b => {

@@ -18,6 +18,7 @@
     <g id="i-window"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6 H14"/></g>
     <g id="i-chip"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/><path d="M6.5 4.5 V2 M9.5 4.5 V2 M6.5 14 V11.5 M9.5 14 V11.5 M4.5 6.5 H2 M4.5 9.5 H2 M14 6.5 H11.5 M14 9.5 H11.5"/></g>
     <g id="i-db"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5 V12.5 C2.5 13.6 5 14.5 8 14.5 C11 14.5 13.5 13.6 13.5 12.5 V3.5 M2.5 8 C2.5 9.1 5 10 8 10 C11 10 13.5 9.1 13.5 8"/></g>
+    <g id="i-drop"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke-dasharray="2.4 1.8"/><path d="M8 5.5 V10.5 M5.8 8.5 L8 10.5 L10.2 8.5"/></g>
     <g id="i-close"><path d="M4 4 L12 12 M12 4 L4 12"/></g>
     <g id="i-info"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.5 V11 M8 5.2 V5.4"/></g>
     <g id="i-check"><circle cx="8" cy="8" r="6.25"/><path d="M5 8.2 L7.2 10.4 L11 6"/></g>
@@ -27,8 +28,10 @@
 </svg>
 
 <div id="app">
-  <!-- 标题栏：内容自绘，右上角 146px 留给库内置的 最小化/最大化/关闭 -->
-  <header class="title-bar">
+  <!-- 标题栏：内容自绘，右上角 146px 留给库内置的 最小化/最大化/关闭。
+       拖动用 v2.3 的 jade-region-drag（运行时自动注入，替代 -webkit-app-region:drag）：
+       单击拖动/贴边/双击最大化同旧方式，但右键不弹系统标题栏菜单 -->
+  <header class="title-bar" jade-region-drag>
     <svg class="icon logo" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><use href="#i-logo"/></svg>
     <span class="app-name">JadeView Go Demo</span>
     <span class="app-sub" id="titleSub">Fluent Design · 纯 Go 绑定</span>
@@ -57,6 +60,10 @@
       <button class="nav-item" data-page="window" role="tab" aria-selected="false" title="窗口">
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#i-window"/></svg>
         <span class="label">窗口</span>
+      </button>
+      <button class="nav-item" data-page="dragdrop" role="tab" aria-selected="false" title="拖拽">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-drop"/></svg>
+        <span class="label">拖拽</span>
       </button>
       <button class="nav-item" data-page="system" role="tab" aria-selected="false" title="系统">
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-chip"/></svg>
@@ -240,6 +247,50 @@
             <button class="btn" data-inv="bounds">窗口边界</button>
             <button class="btn" data-inv="hwnd">句柄 ⇄ 窗口ID</button>
           </div>
+        </div>
+      </section>
+
+      <!-- 拖拽 -->
+      <section class="page" id="page-dragdrop">
+        <h1>拖拽</h1>
+        <p class="lead">窗口拖动区（jade-region-drag，v2.3）与文件拖放（drag-drop 事件，v2.2）。</p>
+
+        <div class="card">
+          <p class="card-title">窗口拖动区（jade-region-drag）</p>
+          <div class="drag-demo" jade-region-drag>
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-window"/></svg>
+            <span class="drag-demo-text">按住这里拖动窗口 · 双击最大化/还原 · 右键只是普通页面右键</span>
+            <button class="btn" id="btnNoDrag" jade-region-no-drag>no-drag 挖洞按钮</button>
+          </div>
+          <p class="hint">
+            HTML 布尔属性即生效（运行时自动注入，无需 JS）：<code>jade-region-drag</code> 标记容器及后代可拖动，
+            <code>jade-region-no-drag</code> 在其中挖洞保持可点击。与旧 CSS <code>-webkit-app-region: drag</code>
+            的区别：右键不弹系统标题栏菜单。顶部标题栏也已换用此方式。
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="log-head" style="margin-bottom:var(--sp-m)">
+            <p class="card-title" style="margin:0">文件拖放（drag-drop 事件）</p>
+            <div class="switch-row">
+              <label class="switch">
+                <input type="checkbox" id="swReject" aria-label="拒绝拖入">
+                <span class="track"></span><span class="knob"></span>
+              </label>
+              <span>拒绝拖入（enter 同步拦截）</span>
+            </div>
+          </div>
+          <div class="dropzone" id="dropzone">
+            <svg class="icon dz-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-drop"/></svg>
+            <p class="dz-title">把文件拖进这个窗口</p>
+            <p class="dz-sub" id="dzStatus">宿主注册 drag-drop 后接管拖拽，enter / over / drop / leave 全程经 IPC 转发回页面</p>
+          </div>
+          <ul class="drop-files" id="dropFiles"></ul>
+          <div class="log" id="dragLog" style="height:140px;margin-top:var(--sp-m)"></div>
+          <p class="hint">
+            开启「拒绝拖入」后，Go 回调在 <code>enter</code> 里同步返回非空值（v2.3 拦截），
+            光标变禁止样式且不会再有 <code>drop</code>；<code>drop</code> 由宿主消费并把 paths 推回页面。
+          </p>
         </div>
       </section>
 

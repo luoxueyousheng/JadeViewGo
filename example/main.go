@@ -3,6 +3,7 @@
 // JadeView Go 封装 · 跨平台可交互示例（Windows / Linux 通用，单一代码库）。
 //
 // 演示内容：窗口、事件桥、IPC 双向通信、异步对话框、系统通知、托盘菜单、
+// 文件拖放（drag-drop 事件 + 同步拦截）、窗口拖动区（jade-region-drag）、
 // YAML 持久化、剪贴板、NTP 网络时间、HWND/窗口ID 互查、显示器/系统信息。
 // 平台差异统一用 runtime.GOOS 分支处理，两端均可直接构建运行。
 //
@@ -29,6 +30,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	jadeview "github.com/luoxueyousheng/JadeViewGo"
@@ -59,7 +61,8 @@ var (
 	mainWindowID uint32
 	trayID       uint32
 	alwaysOnTop  bool
-	dataDir      string // JadeView 数据目录（库运行时数据，WebView 内核要求必须在磁盘上）
+	rejectDrops  atomic.Bool // 拖拽页开关：开启后在 drag-drop 的 enter 子事件里同步拒绝拖入
+	dataDir      string      // JadeView 数据目录（库运行时数据，WebView 内核要求必须在磁盘上）
 )
 
 func main() {
@@ -97,6 +100,7 @@ func main() {
 		}
 		return ""
 	})
+	jadeview.On(jadeview.EventDragDrop, onDragDrop)
 	jadeview.On(jadeview.EventTrayMenuCommand, onTrayMenuCommand)
 	jadeview.On(jadeview.EventTrayEvent, func(_ uint32, data string) string {
 		fmt.Printf("[事件] tray-event: %s\n", data)
@@ -325,6 +329,32 @@ func hasStatusNotifierWatcher() bool {
 	return strings.Contains(string(out), "true")
 }
 
+// onDragDrop 处理拖拽生命周期事件（v2.2 替代 file-drop）。event_data 为 JSON，
+// type 字段区分子事件：enter/drop 带 paths+坐标，over 只带坐标，leave 无附加字段。
+// 宿主注册本事件后会接管拖拽，页面收不到原生 DOM drop——故全程转发给前端拖拽页展示。
+//
+// enter/drop 由库在 GUI 线程内联同步调用并即时读取返回值（v2.3 同步拦截）：
+// 返回空串（→NULL）= 放行/走默认逻辑；返回非空 = 拒绝拖入（enter）/宿主已消费（drop）。
+// 必须尽快返回，转发一律丢给 goroutine，不在回调里做重活。
+func onDragDrop(_ uint32, data string) string {
+	typ := jsonStr(data, "type")
+	if typ != "over" { // over 随鼠标移动高频触发，不刷控制台
+		fmt.Printf("[事件] drag-drop: %s\n", data)
+	}
+	if mainWindowID != 0 {
+		go jadeview.SendIPCMessage(mainWindowID, "drag-drop", data)
+	}
+	switch typ {
+	case "enter":
+		if rejectDrops.Load() {
+			return "1" // 非空经 jade_text_create 回传非 NULL → 拒绝本次拖拽（不会再有 drop）
+		}
+	case "drop":
+		return "1" // 文件路径已由宿主消费（转发前端展示），不交给默认逻辑
+	}
+	return ""
+}
+
 func onTrayMenuCommand(_ uint32, data string) string {
 	fmt.Printf("[事件] tray-menu-command: %s\n", data)
 	// 载荷为 JSON，优先取被点菜单项的 key 精确匹配；
@@ -443,6 +473,16 @@ func registerIPCHandlers() {
 		b, _ := json.Marshal(payload)
 		ok := jadeview.SendIPCMessage(wid, "toast", string(b))
 		return fmt.Sprintf("toast 已推送: %v", ok)
+	})
+
+	// --- 拖拽 ---
+
+	// 切换 enter 同步拦截：payload {"on":true|false}。开启后文件一拖进窗口即被拒绝，
+	// 系统光标变为禁止样式，也不会再收到 drop（见 onDragDrop）。
+	jadeview.RegisterIPCHandler("drag-reject", func(_ uint32, data string) string {
+		on := strings.Contains(data, "true")
+		rejectDrops.Store(on)
+		return fmt.Sprintf("拒绝拖入: %v", on)
 	})
 
 	// --- 系统信息 ---
