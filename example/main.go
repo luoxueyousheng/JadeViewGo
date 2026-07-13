@@ -192,7 +192,7 @@ func onAppReady(windowID uint32, data string) string {
 	// 按平台建窗（前端经 PreloadJS 注入的 __JV_ENV 同步做界面适配，见 app.js applyPlatform）：
 	//   Windows 11 : title-overlay（库内置右上角控制按钮）+ 透明窗口 + Mica 材质（Fluent 2 推荐组合）
 	//   Windows 10 : title-overlay 可用，但无 DWM 材质——不开透明，用纯色背景
-	//   Linux      : DWM 材质/标题栏覆盖层均不可用，系统边框+标题栏、不透明窗口、纯色背景
+	//   Linux      : title-overlay 同样可用（真机验证）；无 DWM 材质，不透明窗口、纯色背景
 	win11 := runtime.GOOS == "windows" && jadeview.IsWindows11()
 	opts := jadeview.DefaultWindowOptions()
 	opts.Title = "JadeView Go Demo (" + runtime.GOOS + "/" + runtime.GOARCH + ")"
@@ -200,9 +200,7 @@ func onAppReady(windowID uint32, data string) string {
 	opts.Height = 720
 	opts.MinWidth = 640
 	opts.MinHeight = 480
-	if runtime.GOOS == "windows" {
-		opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮
-	}
+	opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮（两端可用）
 	if win11 {
 		opts.Transparent = true // 配合 Mica 材质
 	} else {
@@ -229,15 +227,13 @@ func onAppReady(windowID uint32, data string) string {
 	}
 	fmt.Printf("[app-ready] 窗口创建成功 id=%d\n", mainWindowID)
 
-	// Windows 专属外观：Mica 仅 Win11；标题栏覆盖层高 40，与页面 .title-bar / #app 网格行高一致。
+	// Mica 材质仅 Win11；标题栏覆盖层（高 40，与页面 .title-bar / #app 网格行高一致）两端可用。
 	// 图标色初始按浅色主题给，前端探测到实际明暗后经 apply-titlebar 通道再同步。
 	// 非 Win11 平台的纯色背景由前端启动时经 set-backdrop(none) 随明暗主题设置。
 	if win11 {
 		jadeview.SetBackdrop(mainWindowID, jadeview.Backdrop.Mica)
 	}
-	if runtime.GOOS == "windows" {
-		jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
-	}
+	jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
 
 	setupTray()
 	return ""
@@ -395,11 +391,8 @@ func registerIPCHandlers() {
 		return fmt.Sprintf("set_window_theme(%s): %v", mode, ok)
 	})
 
-	// 同步标题栏覆盖层图标色：payload {"dark":true|false}（仅样式，按钮功能库内置）
+	// 同步标题栏覆盖层图标色：payload {"dark":true|false}（仅样式，按钮功能库内置；两端可用）
 	jadeview.RegisterIPCHandler("apply-titlebar", func(wid uint32, data string) string {
-		if runtime.GOOS != "windows" {
-			return "标题栏覆盖层仅 Windows 支持，当前使用系统标题栏"
-		}
 		if strings.Contains(data, "true") {
 			jadeview.SetTitlebarOverlayStyle(wid, titlebarHeight, "#FFFFFF", "#3A3A3A")
 			return "标题栏: 深色图标方案"

@@ -106,9 +106,10 @@ body {
 html[data-inactive] .title-bar .app-name { color: var(--text-2); }   /* 非激活态变暗 */
 html[data-inactive] .title-bar .logo { filter: saturate(0.6); opacity: .7; }
 
-/* 非 Windows（app.js 按宿主 env 通道设置 data-os）：系统自带标题栏，隐藏自绘标题栏行 */
-html[data-os]:not([data-os="windows"]) .title-bar { display: none; }
-html[data-os]:not([data-os="windows"]) #app { grid-template-rows: 1fr; }
+/* 非 Windows：title-overlay 同样可用（Linux 真机已验证），自绘标题栏两端统一显示。
+   jade-region-drag 上游标注为 Windows 特性，Linux 标题栏退回 CSS 拖动区兜底
+   （两套方式可共存互不影响，Windows 上仍以 HTML 属性为准） */
+html[data-os]:not([data-os="windows"]) .title-bar { app-region: drag; -webkit-app-region: drag; }
 
 .main { display: grid; grid-template-columns: auto 1fr; min-height: 0; }
 

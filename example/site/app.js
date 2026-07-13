@@ -139,7 +139,7 @@ function initSeg(root, onChange) {
  * 不存在时启动流程会经 "env" IPC 兜底；两者都拿不到则按 Windows 全功能展示（独立预览）。 */
 const ENV = Object.assign({ os: 'windows', arch: '', win11: true }, window.__JV_ENV);
 function applyPlatform() {
-  document.documentElement.dataset.os = ENV.os;         // CSS 据此隐藏自绘标题栏（Linux 用系统标题栏）
+  document.documentElement.dataset.os = ENV.os;         // CSS 据此做平台适配（如 Linux 标题栏 CSS 拖动区兜底）
   const hasBackdrop = ENV.os === 'windows' && ENV.win11;
   if (hasBackdrop) return;
   // 无 DWM 材质的平台：默认纯色背景，材质选项只留「纯色」
@@ -154,7 +154,7 @@ function applyPlatform() {
   const desc = $('#winDesc');
   if (desc) desc.textContent = ENV.os === 'windows'
     ? 'title-overlay 边框（右上角控制按钮库内置）+ 纯色背景。当前非 Windows 11，Mica/Acrylic 材质不可用，相关选项已停用。'
-    : `系统边框与标题栏（${ENV.os}）+ 纯色背景。DWM 材质与标题栏覆盖层为 Windows 专属，相关选项已停用。`;
+    : `title-overlay 边框（右上角控制按钮库内置，${ENV.os}）+ 纯色背景。DWM 材质为 Windows 11 专属，相关选项已停用。`;
 }
 
 /* ============ 主题（颜色模式） ============ */
@@ -168,7 +168,7 @@ async function applyTheme() {
   if (!hasJade) return;
   const mode = { light: 'Light', dark: 'Dark', system: 'System' }[themeMode];
   await inv('set-theme', { mode }, true);
-  if (ENV.os === 'windows') await inv('apply-titlebar', { dark }, true);  // 标题栏覆盖层仅 Windows
+  await inv('apply-titlebar', { dark }, true);  // 标题栏覆盖层两端可用（Linux 真机已验证）
   if (currentBackdrop === 'none') applyBackdrop('none', true);  // 纯色底随主题换色
 }
 mqDark.addEventListener('change', () => { if (themeMode === 'system') applyTheme(); });
