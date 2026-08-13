@@ -2,7 +2,7 @@
 
 [JadeView](https://jade.run) WebView 桌面库的 Go 封装 —— 用 Go + HTML/CSS/JS 写跨平台桌面应用。窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时一应俱全,头文件 124 个导出函数全部封装。
 
-当前对应上游 **v2.3.0-beta.10**;要求 **Go 1.23+**。
+当前对应上游 **v2.3.1 (Build 26G03)**;要求 **Go 1.23+**。
 
 ## 目录
 
@@ -299,7 +299,7 @@ JadeView/
 
 ## 已知问题 / 注意事项
 
-- **上游版本**:当前全部为 v2.3.0-beta.10,Windows DLL 与 Linux 库已统一。
+- **上游版本**:当前全部为 v2.3.1 (Build 26G03),Windows DLL 与 Linux 库已统一。
 - **`app-ready` 之后再调持久化 API**:YAML 等依赖 `Init` 的 `data_directory` 就绪。
 - **`app_signature` 至少 6 个字符**,过短 `Init` 返回失败且不启动 GUI 线程;建议反域名格式
   (如 `com.example.myapp`)——JAPK 模式下它会作为 `JADE://` URL 的主机名。
@@ -308,7 +308,7 @@ JadeView/
   用 `Preload()` 在启动早期探测并优雅提示。
 - **事件槽位上限**:`On` 与 `RegisterIPCHandler` **共享** `MaxEventHandlers`=64 个槽位;
   IPC handler 无注销 API(上游头文件亦无),注册后**永久占用**一个槽位,规划通道数量时留意。
-- **Linux 托盘会崩、须先探测**:beta.10 的 `tray_create` 在**没有 StatusNotifier 托盘协议**的
+- **Linux 托盘会崩、须先探测**:v2.3.1 (Build 26G03) 的 `tray_create` 在**没有 StatusNotifier 托盘协议**的
   桌面(如 Debian/GNOME 默认桌面,需另装 AppIndicator 扩展)上不是返回 0,而是让库 GUI 线程
   RUNTIME_PANIC 直接 abort(已反馈上游)。调用前先探测会话 D-Bus 上有无
   `org.kde.StatusNotifierWatcher`,没有就跳过托盘——参考 `example/main.go` 的
