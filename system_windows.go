@@ -393,15 +393,6 @@ func YAMLDeleteFile(fileName string) int32 {
 
 // --- JAPK 资源包：签名校验与加载 ---
 
-// SetPublicKey 设置 Ed25519 公钥（Base64，44 字符），必须在加载 JAPK 之前调用。
-// 返回 0=成功，负数=错误码。
-func SetPublicKey(publicKey string) int32 {
-	pool := &cstrs{}
-	r, _, _ := procSetPublicKey.Call(uintptr(unsafe.Pointer(pool.p(publicKey))))
-	runtime.KeepAlive(pool)
-	return i32(r)
-}
-
 // LoadFromBytes 从内存加载 JAPK 文件（支持 v2 签名包与混淆包）。
 //   - 已设公钥：必须是签名包，验签后加载；
 //   - 未设公钥：仅支持混淆包（JPKBIN02）。

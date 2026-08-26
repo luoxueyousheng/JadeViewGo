@@ -195,12 +195,12 @@ func yamlGet(fn func(buf unsafe.Pointer, size uintptr) int32) (string, int32) {
 
 var (
 	// --- lifecycle ---
-	procJadeViewInit   = np("JadeView_init")
-	procRunMessageLoop = np("run_message_loop")
-	procJadeviewExit   = np("jadeview_exit")
+	procJadeViewInit     = np("JadeView_init")
+	procRunMessageLoop   = np("run_message_loop")
+	procJadeviewExit     = np("jadeview_exit")
+	procJadeviewExitWait = np("jadeview_exit_wait")
 
 	// --- japk ---
-	procSetPublicKey    = np("JadeView_set_public_key")
 	procLoadFromBytes   = np("JadeView_load_from_bytes")
 	procIsLoaded        = np("JadeView_is_loaded")
 	procGetAppSignature = np("JadeView_get_app_signature")
@@ -261,6 +261,10 @@ var (
 	procSetWindowProgress      = np("set_window_progress")
 	procFlashWindow            = np("flash_window")
 	procShowAboutDialog        = np("show_about_dialog")
+
+	// --- webview permission ---
+	procSetWebviewPermissionHandler   = np("set_webview_permission_handler")
+	procClearWebviewPermissionHandler = np("clear_webview_permission_handler")
 
 	// --- tray ---
 	procTrayCreate          = np("tray_create")

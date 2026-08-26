@@ -68,6 +68,10 @@ typedef struct WebViewSettings {
    * 初始是否自动获取焦点 (0=否, 1=是)
    */
   int32_t focused;
+  /**
+   * Windows 专属：WebView2 Profile 名称（NULL/空字符串表示默认 Profile）
+   */
+  const char *profile_name;
 } WebViewSettings;
 
 /**
@@ -419,44 +423,30 @@ typedef struct TrayMenuItemDesc {
 // -----------------------
 
 #ifndef JADEVIEW_CALL
-#if defined(_WIN32)
 #define JADEVIEW_CALL __stdcall
-#else
-#define JADEVIEW_CALL
-#endif
 #endif
 
 // 回调函数类型定义
 typedef const char* (JADEVIEW_CALL *IpcCallback)(uint32_t, const char*);
+typedef int32_t (JADEVIEW_CALL *PermissionCallback)(uint32_t, const char*);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // --- from japk_api.rs ---
-// 设置公钥 (必须在加载 JAPK 之前调用)
-// # 参数
-// - `public_key`: Base64 编码的 Ed25519 公钥 (44 字符)
-// # 返回
-// - 0=成功, 负数=错误码
-int32_t JADEVIEW_CALL JadeView_set_public_key(const char* public_key);
-// 从内存加载 JAPK 文件（支持签名包和混淆包）
+// 从内存加载 JAPK 文件（仅支持 JAPK v2 签名包）
 // # 参数
 // - `japk_data`: JAPK 文件数据指针
 // - `data_size`: 数据大小
 // # 返回
 // - 0=成功, 负数=错误码
 // # 加载逻辑
-// | 公钥设置 | 数据格式 | 结果 |
-// |----------|----------|------|
-// | 已设置 | JAPK v2 签名包 | 验证签名后加载 |
-// | 已设置 | 其他格式 | 返回错误 |
-// | 未设置 | JAPK v2 签名包 | 返回错误（需要公钥）|
-// | 未设置 | 混淆包 (JPKBIN02) | 解混淆后加载 |
-// | 未设置 | 其他格式 | 返回错误 |
+// - 仅接受带 JadeTweak 平台根证明和叶子签名的 JAPK v2 包
+// - 不接受运行时注入的任意公钥，也不回退到旧签名协议或无签名格式
 // # 说明
-// - 如果设置了公钥，必须是签名包，不会回退到混淆包逻辑
-// - app_name 和 app_signature 必须与 JadeView_init 时设置的一致
+// - app_name、app_signature 和当前进程 EXE 名必须与平台证明一致
+// - 证书到期或吊销不影响已签包的离线密码学验证
 // - 错误信息通过 jade_on 事件异步通知
 int32_t JADEVIEW_CALL JadeView_load_from_bytes(const uint8_t* japk_data, size_t data_size);
 // 获取加载状态
@@ -489,10 +479,10 @@ int32_t JADEVIEW_CALL JadeView_unload(void);
 int32_t JADEVIEW_CALL JadeView_init(int32_t enable_devmod, const char* log_path, const char* data_directory, const char* app_name, const char* app_signature, int32_t single_instance);
 // 运行消息循环
 int32_t JADEVIEW_CALL run_message_loop(void);
-// 清理所有窗口并结束消息循环
+// 清理所有窗口并结束消息循环；默认最多等待 30 秒。
 int32_t JADEVIEW_CALL jadeview_exit(void);
-// [已废弃] 请使用 jadeview_exit() 代替
-int32_t JADEVIEW_CALL cleanup_all_windows(void);
+// 清理所有窗口并等待事件循环和 JadeView 后台线程退出。
+int32_t JADEVIEW_CALL jadeview_exit_wait(uint32_t timeout_ms);
 
 // --- from window.rs ---
 // 创建WebView窗口
@@ -508,6 +498,14 @@ uint32_t JADEVIEW_CALL get_window_id(int32_t hwnd);
 int32_t JADEVIEW_CALL navigate_to_url(uint32_t window_id, const char* url, const char* headers_json);
 // 刷新webview页面
 int32_t JADEVIEW_CALL reload_webview_window(uint32_t window_id);
+// 原生后退
+int32_t JADEVIEW_CALL webview_go_back(uint32_t window_id);
+// 原生前进
+int32_t JADEVIEW_CALL webview_go_forward(uint32_t window_id);
+// 查询是否可后退
+int32_t JADEVIEW_CALL webview_can_go_back(uint32_t window_id);
+// 查询是否可前进
+int32_t JADEVIEW_CALL webview_can_go_forward(uint32_t window_id);
 // 执行JavaScript，返回唯一id，通过javascript-result事件返回结果
 int32_t JADEVIEW_CALL execute_javascript(uint32_t window_id, const char* script);
 // 设置窗口标题
@@ -586,6 +584,10 @@ int32_t JADEVIEW_CALL set_window_max_size(uint32_t window_id, int32_t width, int
 int32_t JADEVIEW_CALL set_window_resizable(uint32_t window_id, int32_t resizable);
 int32_t JADEVIEW_CALL set_window_ignore_cursor_events(uint32_t window_id, int32_t ignore);
 int32_t JADEVIEW_CALL get_webview_url(uint32_t window_id, char* buffer, int32_t buffer_size);
+// 设置统一网页权限处理器
+int32_t JADEVIEW_CALL set_webview_permission_handler(PermissionCallback callback);
+// 清除统一网页权限处理器
+int32_t JADEVIEW_CALL clear_webview_permission_handler(void);
 int32_t JADEVIEW_CALL open_devtools(uint32_t window_id);
 int32_t JADEVIEW_CALL close_devtools(uint32_t window_id);
 int32_t JADEVIEW_CALL is_devtools_open(uint32_t window_id);

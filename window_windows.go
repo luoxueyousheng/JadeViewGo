@@ -53,6 +53,7 @@ type cWebViewSettings struct {
 	disableClipboard       int32
 	proxyURL               *byte
 	focused                int32
+	profileName            *byte // Windows WebView2 Profile 名称，多窗口 Cookie/存储/缓存隔离
 }
 
 func bi32(b bool) int32 {
@@ -109,6 +110,7 @@ func (s *WebViewSettings) toC(pool *cstrs) cWebViewSettings {
 		disableClipboard:       bi32(s.DisableClipboard),
 		proxyURL:               pool.p(s.ProxyURL),
 		focused:                bi32(s.Focused),
+		profileName:            pool.p(s.ProfileName),
 	}
 }
 
@@ -287,6 +289,13 @@ func RunMessageLoop() {
 // Exit 清理所有窗口并结束消息循环。
 func Exit() {
 	procJadeviewExit.Call()
+}
+
+// ExitWait 清理所有窗口并等待事件循环与 JadeView 后台线程（GUI/回调/日志/托盘/单实例）
+// 退出完成，最多等待 timeoutMs 毫秒。相比 Exit，本函数会等待运行时卸载完毕，
+// 便于可靠释放 DLL 与后续重复初始化（2.4.0 新增）。
+func ExitWait(timeoutMs uint32) {
+	procJadeviewExitWait.Call(uintptr(timeoutMs))
 }
 
 // --- 窗口状态查询 ---

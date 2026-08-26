@@ -1,8 +1,10 @@
 ﻿# JadeView Go 封装
 
-[JadeView](https://jade.run) WebView 桌面库的 Go 封装 —— 用 Go + HTML/CSS/JS 写跨平台桌面应用。窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时一应俱全,头文件 124 个导出函数全部封装。
+[JadeView](https://jade.run) WebView 桌面库的 Go 封装 —— 用 Go + HTML/CSS/JS 写跨平台桌面应用。窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时一应俱全,头文件 129 个导出函数中 124 个已封装。
 
-当前对应上游 **v2.3.2 (Build 26H01)**;要求 **Go 1.23+**。
+> ⚠️ **v2.4.0 破坏性变更**:JAPK 包从此**只能加载带签名的资源包**(v3 签名协议,平台根证书链严格离线验签),混淆包与公钥注入机制(`SetPublicKey`)均已移除。详见[已知问题](#已知问题--注意事项)与 [CHANGELOG](CHANGELOG.md)。
+
+当前 **Windows 对应上游 v2.4.0 (Build 26H03)**;Linux 库维持 v2.3.x(上游已停止更新);要求 **Go 1.23+**。
 
 ## 目录
 
@@ -185,7 +187,7 @@ go run ./example
 
 | plan | 方式 | 适用场景 |
 |------|------|----------|
-| 0(默认) | **JAPK 资源包**:`go:embed` 的 `app.japk` 经 `LoadFromBytes` 内存加载,再以**空路径**调 `SetProtocolServicePath("", false)` 切到内存 JAPK 模式,URL 形如 `JADE://<app_signature>` | 加密/混淆分发 |
+| 0(默认) | **JAPK 资源包**:`go:embed` 的 `app.japk` 经 `LoadFromBytes` 内存加载,再以**空路径**调 `SetProtocolServicePath("", false)` 切到内存 JAPK 模式,URL 形如 `JADE://<app_signature>` | 加密分发(⚠️ v2.4.0 起仅限签名包) |
 | 1 | **协议服务挂源码目录**:`SetProtocolServicePath("example/site", hotReload=true)`,改动站点文件页面即时刷新 | 开发调试 |
 | 2 | **进程内回环 HTTP**:127.0.0.1 随机端口直出 `embed.FS`,磁盘零前端文件 | 单 exe 分发(不想用 JAPK 时) |
 
@@ -198,8 +200,8 @@ go run ./example
   postMessage)可能被跨域限制拦截。`WebViewSettings.CORSWhitelist`/`PostMessageWhitelist`
   可设白名单,但库**没有接口能查到它注册的临时域**,无法精确加白——示例用
   `PostMessageWhitelist: "*"` 兜底;分发场景优先选 jade:// 同源方案(plan 0/1)。
-- JAPK 的 app_name/app_signature 必须与 `Init` 一致,加载错误详情经 `japk-load-failed`
-  事件回报;`data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航)。
+- **JAPK 签名强制(v2.4.0)**:`LoadFromBytes` 只接受带 JadeTweak 平台根证明与叶子签名的 **v3 签名包**;混淆包(JPKBIN02)不再支持,`app_name`/`app_signature`
+  必须与 `Init` 及平台证明一致。加载错误详情经 `japk-load-failed` 事件回报;`data:` URL 方案实测不可行(WebView2 拒绝 data: 顶层导航)。
 - 托盘图标走内存 API(`TraySetIconFromData`,.ico 仅 Windows 传)。
 
 ## API 总览
@@ -209,19 +211,20 @@ Linux 实现是不带后缀的 cgo 文件(`//go:build linux`)。
 
 | 模块 | 主要函数 |
 |------|----------|
-| 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` / `Preload`（Windows 提前加载 DLL 并拿到错误;Linux 恒 nil） |
-| 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`,默认值用 `DefaultWindowOptions`/`DefaultWebViewSettings`）、`CreateBorderlessWindow`、`Navigate`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
+| 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` / `ExitWait`（等待后台线程完全退出,便于可靠卸载）/ `Preload`（Windows 提前加载 DLL 并拿到错误;Linux 恒 nil） |
+| 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`,默认值用 `DefaultWindowOptions`/`DefaultWebViewSettings`;v2.4.0 新增 `ProfileName`,Windows 多窗口 Cookie/存储/缓存隔离）、`CreateBorderlessWindow`、`Navigate`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
 | 窗口扩展 | 状态查询 `Is*`、`GetWindowBounds`、`GetWindowHWND`⇄`GetWindowID`、层级/背景/全屏/主题/缩放、DevTools、`SendIPCMessage`、任务栏进度/闪烁 |
-| 事件桥 | `On` / `Off` / `RegisterIPCHandler`（槽位池,上限 `MaxEventHandlers`=64） |
+| 事件桥 | `On` / `Off` / `RegisterIPCHandler`（槽位池,上限 `MaxEventHandlers`=64）、统一网页权限处理器 `SetWebviewPermissionHandler` / `ClearWebviewPermissionHandler`（摄像头/麦克风/录屏/文件访问等） |
 | 对话框/菜单 | `ShowNotification`、`ShowOpenDialog`/`ShowSaveDialog`/`ShowMessageBox`/`ShowErrorBox`、右键菜单 `MenuItemCreate`/`SetContextMenuItems` |
 | 异步对话框 | `ShowOpenDialogAsync`/`ShowSaveDialogAsync`/`ShowMessageBoxAsync`（上限 `MaxAsyncDialogs`=16） |
 | 托盘 | `TrayCreate`/`TraySetMenu`（扁平表）/`TraySetIconFromFile`/`TraySetIconFromData` |
 | YAML 存储 | `YAMLSet`/`YAMLGet`/`YAMLGetAll`/`YAMLKeys`/`YAMLHas`/`YAMLDelete`/`YAMLLen`/`YAMLClear`/`YAMLDeleteFile` |
 | 系统工具 | 剪贴板、`GetPath`/`GetLocale`/`GetDisplaysInfo`、打印、全局热键、开机自启、URL 协议/文件关联、安全资源、`GetFileIcon`、`SmartConvertEncoding`、`NTPNow` |
-| JAPK 资源包 | `SetPublicKey`/`LoadFromBytes`/`IsLoaded`/`GetAppSignature`/`GetSignatureInfo`/`Unload` |
+| JAPK 资源包 | `LoadFromBytes`/`IsLoaded`/`GetAppSignature`/`GetSignatureInfo`/`Unload`（v2.4.0 起仅限签名包,`SetPublicKey` 已随上游移除） |
 
-有意不封装的 2 个:`cleanup_all_windows`(上游已废弃,用 `Exit`)、`yaml_get_str`
-(要求 `CoTaskMemFree` 释放,跨平台不可移植,用缓冲区版 `YAMLGet` 替代)。
+有说明的几点:`cleanup_all_windows` 与 `JadeView_set_public_key` 已被上游 v2.4.0 **整体移除**,本封装不再提供;2.4.0 新增的导航历史 API
+(`webview_go_back`/`webview_go_forward`/`webview_can_go_back`/`webview_can_go_forward`)暂未包装,随下个版本补充;`yaml_get_str`
+仍不封装(要求 `CoTaskMemFree` 释放,跨平台不可移植,用缓冲区版 `YAMLGet` 替代)。
 
 **枚举**:固定取值的参数都有二级命名空间枚举(`enums.go`),不必裸写字符串/数字——
 `Theme.Dark`、`FrameStyle.TitleOverlay`、`WindowLevel.Topmost`、`Backdrop.Mica`、
@@ -265,8 +268,8 @@ JadeView/
    **首次调用任一 API(或 `Preload`)时**才释放到 `%TEMP%\jadeview\<架构>-<内容哈希前8位>\`
    (内容寻址:换版本换目录,已存在文件按完整 sha256 校验、不符重写,多进程多版本并存安全;
    仅 import 本包无任何磁盘副作用)。exe 同目录的 `JadeView.dll` 优先。
-2. **加载与调用**:`syscall.NewLazyDLL` 按绝对路径惰性加载;全部 124 个导出函数经
-   惰性代理 `jvProc.Call` 直调(`dll_windows.go` 内含完整地址表)。**加载失败时首次 API
+2. **加载与调用**:`syscall.NewLazyDLL` 按绝对路径惰性加载;头文件 129 个导出函数中已封装的
+   124 个经惰性代理 `jvProc.Call` 直调(`dll_windows.go` 内含完整地址表)。**加载失败时首次 API
    调用会 panic**(`syscall.LazyProc` 语义)——需优雅降级的宿主在启动早期调 `Preload()`
    检查错误即可。
 3. **结构体传参**:`WebViewWindowOptions` 等 6 个 C 结构体在 Go 侧逐字段镜像
@@ -299,7 +302,13 @@ JadeView/
 
 ## 已知问题 / 注意事项
 
-- **上游版本**:当前全部为 v2.3.2 (Build 26H01),Windows DLL 与 Linux 库已统一。
+- **上游版本 / 平台差异(重要)**:**Windows 已升级至 v2.4.0 (Build 26H03)**——三个架构的
+  `JadeView.dll` 与 2.4.0 官方头文件同步;**Linux 库维持 v2.3.x**(上游已停止更新)。由于 2.4.0
+  头文件移除了 `JadeView_set_public_key`,而 Linux cgo(`japk.go`)仍引用它,**Linux 侧当前无法编译**;
+  Windows 构建与运行不受影响。
+- **JAPK 仅限签名包(v2.4.0 破坏性变更)**:`LoadFromBytes` 只接受 v3 签名包(平台根证书链严格离线验签),
+  混淆包(JPKBIN02)与运行时公钥注入(`SetPublicKey`)均已废弃。分发前端资源可临时改用协议服务目录模式(plan 1)
+  或回环 HTTP(plan 2)。
 - **`app-ready` 之后再调持久化 API**:YAML 等依赖 `Init` 的 `data_directory` 就绪。
 - **`app_signature` 至少 6 个字符**,过短 `Init` 返回失败且不启动 GUI 线程;建议反域名格式
   (如 `com.example.myapp`)——JAPK 模式下它会作为 `JADE://` URL 的主机名。

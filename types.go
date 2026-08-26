@@ -65,6 +65,7 @@ type WebViewSettings struct {
 	DisableClipboard       bool   // 禁用剪贴板读写权限
 	ProxyURL               string // 代理，如 "http://host:port"/"socks5://host:port"，空=不使用
 	Focused                bool   // 创建后 WebView 自动获取焦点
+	ProfileName            string // Windows WebView2 Profile 名称；非空时多窗口的 Cookie/存储/缓存相互隔离，空=默认 Profile
 }
 
 // DefaultWebViewSettings 返回一组桌面应用常用默认值（与 DefaultWindowOptions 对称）：
