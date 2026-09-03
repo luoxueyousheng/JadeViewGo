@@ -13,18 +13,7 @@ import "unsafe"
 // JAPK 资源包：加密/签名的前端资源包，加载后通过 jade:// 协议访问。
 // 返回值约定与其它模块不同：0=成功，负数=错误码。
 
-// SetPublicKey 设置 Base64 编码的 Ed25519 公钥（44 字符），必须在 LoadFromBytes 之前调用。
-// 返回 0=成功，负数=错误码。
-func SetPublicKey(publicKey string) int32 {
-	pool := &cstrPool{}
-	defer pool.free()
-	return int32(C.JadeView_set_public_key(pool.s(publicKey)))
-}
-
-// LoadFromBytes 从内存加载 JAPK 文件（支持 v2 签名包与混淆包）。
-//   - 已设公钥：必须是签名包，验签后加载；
-//   - 未设公钥：仅支持混淆包（JPKBIN02）。
-//
+// LoadFromBytes 从内存加载 JAPK 文件（仅支持签名包，加载时严格离线验签）。
 // app_name / app_signature 须与 Init 时一致。返回 0=成功，负数=错误码。
 // 错误信息也会通过事件异步通知。
 func LoadFromBytes(data []byte) int32 {

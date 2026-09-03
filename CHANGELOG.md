@@ -21,6 +21,10 @@
 - **`ExitWait(timeoutMs)`**:清理所有窗口并等待事件循环与后台线程(GUI/回调/日志/托盘/单实例)完全退出,便于可靠卸载 DLL
   与重复初始化;`Exit` 内部亦改为等待运行时完成退出。
 - **`WebViewSettings.ProfileName`**:Windows WebView2 Profile 名称,非空时多窗口的 Cookie、存储与缓存相互隔离。
+- **导航历史 API**:`GoBack` / `GoForward` / `CanGoBack` / `CanGoForward`,
+  对应头文件 `webview_go_back` / `webview_go_forward` / `webview_can_go_back` / `webview_can_go_forward`。
+  至此头文件 129 个导出函数中已封装 128 个,仅 `yaml_get_str` 未封装(要求 `CoTaskMemFree` 释放,不可移植;
+  `YAMLGet` 已用缓冲区两阶段查询等价实现)。
 
 ### 变更
 
@@ -31,14 +35,12 @@
 ### 平台说明
 
 - **Windows**:amd64 / 386 / arm64 DLL 已刷新为 2.4.0,构建与运行全部验证通过。
-- **Linux**:**当前无法编译**——2.4.0 头文件删除了 `JadeView_set_public_key`,而 Linux cgo(`japk.go`)仍引用该符号,
-  且上游已停止发布新版 Linux 库。待后续版本处理。
+- **Linux**:上游已停止发布新版 Linux 库,`lib/linux_*` 维持 v2.3.x;本版本起一并移除了 Linux cgo 中引用已删符号的 `SetPublicKey`,Linux 构建暂不维护。
 
 ### 未封装说明
 
-头文件 129 个导出函数中已封装 124 个。未封装:`yaml_get_str`(要求 `CoTaskMemFree` 释放,不可移植);
-以及 2.4.0 新增的导航历史 API `webview_go_back` / `webview_go_forward` / `webview_can_go_back` / `webview_can_go_forward`
-(暂未包装,随下个版本补充)。DLL 中另有 4 个内部辅助导出(`gbk_to_utf8` 等)不属于公开 API。
+头文件 129 个导出函数中已封装 128 个。未封装:`yaml_get_str`(要求 `CoTaskMemFree` 释放,不可移植)。
+DLL 中另有 4 个内部辅助导出(`gbk_to_utf8` 等)不属于公开 API。
 
 ## [v2.3.2] - 此前
 

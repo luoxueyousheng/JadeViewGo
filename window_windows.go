@@ -175,6 +175,30 @@ func Reload(windowID uint32) bool {
 	return i32(r) == 1
 }
 
+// GoBack 导航历史后退（原生后退）。
+func GoBack(windowID uint32) bool {
+	r, _, _ := procWebviewGoBack.Call(uintptr(windowID))
+	return i32(r) == 1
+}
+
+// GoForward 导航历史前进（原生前进）。
+func GoForward(windowID uint32) bool {
+	r, _, _ := procWebviewGoForward.Call(uintptr(windowID))
+	return i32(r) == 1
+}
+
+// CanGoBack 查询当前页面能否后退。
+func CanGoBack(windowID uint32) bool {
+	r, _, _ := procWebviewCanGoBack.Call(uintptr(windowID))
+	return i32(r) == 1
+}
+
+// CanGoForward 查询当前页面能否前进。
+func CanGoForward(windowID uint32) bool {
+	r, _, _ := procWebviewCanGoForward.Call(uintptr(windowID))
+	return i32(r) == 1
+}
+
 // ExecuteJavaScript 执行 JS，返回一个唯一 id；结果通过 "javascript-result" 事件异步返回。
 func ExecuteJavaScript(windowID uint32, script string) int32 {
 	pool := &cstrs{}

@@ -1,29 +1,26 @@
-﻿# JadeView Go 封装
+# JadeView Go 封装
 
-[JadeView](https://jade.run) WebView 桌面库的 Go 封装 —— 用 Go + HTML/CSS/JS 写跨平台桌面应用。窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时一应俱全,头文件 129 个导出函数中 124 个已封装。
+[JadeView](https://jade.run) WebView 桌面库的 Go 封装 —— 用 Go + HTML/CSS/JS 写 Windows 桌面应用。窗口、事件、双向 IPC、托盘、对话框、通知、YAML 持久化、NTP 授时一应俱全,头文件 129 个导出函数中 128 个已封装(仅 `yaml_get_str` 因跨平台内存管理差异未封装)。
 
 > ⚠️ **v2.4.0 破坏性变更**:JAPK 包从此**只能加载带签名的资源包**(v3 签名协议,平台根证书链严格离线验签),混淆包与公钥注入机制(`SetPublicKey`)均已移除。详见[已知问题](#已知问题--注意事项)与 [CHANGELOG](CHANGELOG.md)。
 
-当前 **Windows 对应上游 v2.4.0 (Build 26H03)**;Linux 库维持 v2.3.x(上游已停止更新);要求 **Go 1.23+**。
+当前对应上游 **v2.4.0 (Build 26H03)**;要求 **Go 1.23+**。
 
 ## 目录
 
 - [支持平台](#支持平台)
 - [安装](#安装)
-- [平台前置条件与上手](#平台前置条件与上手) — [Windows](#windows) · [Linux](#linux)
+- [前置条件与上手](#前置条件与上手)
 - [快速开始](#快速开始)
 - [示例](#示例example)
 - [API 总览](#api-总览)
-- [目录结构](#目录结构) · [实现原理](#windows-纯-go-实现原理) · [升级上游库](#升级上游库) · [已知问题](#已知问题--注意事项)
+- [目录结构](#目录结构) · [实现原理](#纯-go-实现原理) · [升级上游库](#升级上游库) · [已知问题](#已知问题--注意事项)
 
 ## 支持平台
 
 | 平台 | 架构 | 实现 | 构建依赖 | 运行时依赖 | 分发形态 |
 |------|------|------|----------|------------|----------|
 | **Windows** | amd64 / 386 / arm64 | 纯 Go（syscall 直调内置 DLL） | **仅 Go 工具链** | WebView2 Runtime（Win11 自带） | 单 exe 自包含 |
-| **Linux** | amd64 / arm64 | cgo 静态链接 `libJadeView.a` | Go + gcc + GTK3 / WebKit2GTK / xdo 开发包 | GTK3 / WebKit2GTK / libxdo3 + 图形桌面 | 单二进制（依赖系统库） |
-
-两侧公共 API 完全一致,同一份业务代码可直接跨平台编译;差异只在**构建前置条件**——详见下方[平台前置条件与上手](#平台前置条件与上手)。
 
 ## 安装
 
@@ -31,24 +28,19 @@
 
 ```bash
 go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
-go get github.com/luoxueyousheng/JadeViewGo@v0.2.3    # 锁定指定版本
+go get github.com/luoxueyousheng/JadeViewGo@v2.4.0    # 锁定指定版本
 ```
 
 只想先跑一眼内置示例(示例是模块子包,可直接运行):
 
 ```bash
-go run github.com/luoxueyousheng/JadeViewGo/example@v0.2.3
+go run github.com/luoxueyousheng/JadeViewGo/example@v2.4.0
 ```
 
-> - 依赖拉下来后,**构建仍需满足对应平台的前置条件**(下一节);Linux 尤其别漏系统开发包。
-> - 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
->   `@v0.2.3`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
+> 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
+> `@v2.4.0`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
 
-## 平台前置条件与上手
-
-> 挑你的目标系统看对应小节即可,每节都是「前置条件 → 构建 → 运行」自包含流程。
-
-### Windows
+## 前置条件与上手
 
 **前置条件**
 
@@ -77,61 +69,6 @@ $env:GOARCH="arm64"; go build -ldflags "-H windowsgui" -o myapp_arm64.exe .
 若 exe 同目录放了 `JadeView.dll`,则优先用它(便于调试或临时换库)。
 
 > 调试看日志用控制台版;`-H windowsgui` 无控制台,`fmt.Printf` 看不到输出。
-
-### Linux
-
-Linux 侧走 cgo,静态链接 `libJadeView.a`;该库仍依赖系统的 GTK3 / WebKit2GTK / libxdo 动态库。构建机与目标机的依赖要**分别**装。
-
-**前置条件 · 构建机**(Debian / Ubuntu 系)
-
-```bash
-sudo apt install build-essential pkg-config \
-    libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev
-```
-
-| 包 | 作用 | 漏了会报 |
-|----|------|----------|
-| `build-essential` | gcc + libc 头文件(cgo 必需) | `stdlib.h: No such file or directory` |
-| `pkg-config` | 拉取 GTK/WebKit 链接参数 | 找不到库 |
-| `libgtk-3-dev` · `libwebkit2gtk-4.1-dev` | GTK3 / WebKit2GTK 开发包 | 编译或链接失败 |
-| `libxdo-dev` | libxdo(xdotool)——`libJadeView.a` 硬引用它(托盘菜单发按键序列) | `cannot find -lxdo` |
-
-> **老发行版只有 WebKit2GTK 4.0**(无 4.1 包):把 `jadeview_linux_amd64.go` /
-> `jadeview_linux_arm64.go` 里的 `webkit2gtk-4.1` 改成 `webkit2gtk-4.0`。先用
-> `pkg-config --exists webkit2gtk-4.1 && echo 有4.1 || echo 用4.0` 确认。
-
-**前置条件 · 目标机(运行时)**
-
-```bash
-sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libxdo3   # 运行时库(非 -dev)
-```
-
-外加 **X11 / Wayland 图形桌面**——GUI 需要显示环境。
-
-**构建 / 运行**
-
-```bash
-CGO_ENABLED=1 go build ./...     # 验证编译 + 链接
-go run ./example                 # 需要图形桌面
-```
-
-**无桌面 / 远程 X11 / 无 GPU 环境**(headless 服务器、NAS、SSH X11 转发)
-
-WebKit 默认走 GPU 合成,拿不到 EGL/DRI(`/dev/dri` 缺失或无权限)时会直接崩溃。强制软件渲染:
-
-```bash
-WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 \
-LIBGL_ALWAYS_SOFTWARE=1 go run ./example
-```
-
-- **SSH X11 转发**:用**原登录用户**跑;`su` / `sudo` 切到 root 会丢失 X 授权 cookie,报 `No authorisation provided`。
-- **纯 headless**(无任何显示):GUI 起不来,只能 `go build ./...` 验证编译链接是否通过。
-
-**arm64 补充**
-
-库文件在 `lib/linux_arm64/`,用法与 amd64 完全一致。**推荐在 arm64 机器上原生构建**
-(树莓派、云 ARM 实例、ARM NAS 等);交叉编译需 `aarch64-linux-gnu-gcc` 加 arm64 版
-GTK/WebKit sysroot,配置繁琐,一般不值得。
 
 ## 快速开始
 
@@ -163,8 +100,6 @@ func main() {
 
 ## 示例（example/）
 
-一份代码,Windows / Linux 都能跑(平台差异用 `runtime.GOOS` 分支)。装好对应平台前置条件后:
-
 ```bash
 go run ./example
 ```
@@ -179,7 +114,7 @@ go run ./example
 - **窗口**:置顶开关、最小化、全屏、任务栏闪烁、边界查询、HWND⇄窗口ID 互查、DevTools。
 - **系统**:异步对话框(打开/保存/消息框)、系统通知、剪贴板读写、NTP 网络时间。
 - **存储**:YAML 写入/读取/全量读取(存于 `Init` 的数据目录)。
-- **托盘**:右键菜单显示/隐藏窗口、退出(Linux 先探测 D-Bus 托盘协议,无支持则跳过,见「已知问题」)。
+- **托盘**:右键菜单显示/隐藏窗口、退出。
 - **WebView 设置**:`DefaultWebViewSettings` 起步,用 `PreloadJS` 在页面脚本运行前注入
   平台信息(`window.__JV_ENV`),前端同步读取做平台适配(标题栏/材质),`env` IPC 通道兜底。
 
@@ -206,13 +141,12 @@ go run ./example
 
 ## API 总览
 
-公共 API 跨平台一致,共享类型在 `types.go`;Windows 实现是 `*_windows.go`(纯 Go),
-Linux 实现是不带后缀的 cgo 文件(`//go:build linux`)。
+共享类型在 `types.go`,实现是 `*_windows.go`(纯 Go)。
 
 | 模块 | 主要函数 |
 |------|----------|
-| 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` / `ExitWait`（等待后台线程完全退出,便于可靠卸载）/ `Preload`（Windows 提前加载 DLL 并拿到错误;Linux 恒 nil） |
-| 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`,默认值用 `DefaultWindowOptions`/`DefaultWebViewSettings`;v2.4.0 新增 `ProfileName`,Windows 多窗口 Cookie/存储/缓存隔离）、`CreateBorderlessWindow`、`Navigate`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
+| 生命周期 | `Init` / `Version` / `RunMessageLoop` / `Exit` / `ExitWait`（等待后台线程完全退出,便于可靠卸载）/ `Preload`（提前加载 DLL 并拿到错误） |
+| 窗口创建 | `CreateWindow`（`WindowOptions`/`WebViewSettings`,默认值用 `DefaultWindowOptions`/`DefaultWebViewSettings`;v2.4.0 新增 `ProfileName`,多窗口 Cookie/存储/缓存隔离）、`CreateBorderlessWindow`、`Navigate`、`GoBack`/`GoForward`、`CanGoBack`/`CanGoForward`、`ExecuteJavaScript`、`SetTitle/SetSize/SetPosition/...` |
 | 窗口扩展 | 状态查询 `Is*`、`GetWindowBounds`、`GetWindowHWND`⇄`GetWindowID`、层级/背景/全屏/主题/缩放、DevTools、`SendIPCMessage`、任务栏进度/闪烁 |
 | 事件桥 | `On` / `Off` / `RegisterIPCHandler`（槽位池,上限 `MaxEventHandlers`=64）、统一网页权限处理器 `SetWebviewPermissionHandler` / `ClearWebviewPermissionHandler`（摄像头/麦克风/录屏/文件访问等） |
 | 对话框/菜单 | `ShowNotification`、`ShowOpenDialog`/`ShowSaveDialog`/`ShowMessageBox`/`ShowErrorBox`、右键菜单 `MenuItemCreate`/`SetContextMenuItems` |
@@ -222,9 +156,9 @@ Linux 实现是不带后缀的 cgo 文件(`//go:build linux`)。
 | 系统工具 | 剪贴板、`GetPath`/`GetLocale`/`GetDisplaysInfo`、打印、全局热键、开机自启、URL 协议/文件关联、安全资源、`GetFileIcon`、`SmartConvertEncoding`、`NTPNow` |
 | JAPK 资源包 | `LoadFromBytes`/`IsLoaded`/`GetAppSignature`/`GetSignatureInfo`/`Unload`（v2.4.0 起仅限签名包,`SetPublicKey` 已随上游移除） |
 
-有说明的几点:`cleanup_all_windows` 与 `JadeView_set_public_key` 已被上游 v2.4.0 **整体移除**,本封装不再提供;2.4.0 新增的导航历史 API
-(`webview_go_back`/`webview_go_forward`/`webview_can_go_back`/`webview_can_go_forward`)暂未包装,随下个版本补充;`yaml_get_str`
-仍不封装(要求 `CoTaskMemFree` 释放,跨平台不可移植,用缓冲区版 `YAMLGet` 替代)。
+有说明的几点:`cleanup_all_windows` 与 `JadeView_set_public_key` 已被上游 v2.4.0 **整体移除**,本封装不再提供;导航历史 API
+已封装为 `GoBack` / `GoForward` / `CanGoBack` / `CanGoForward`(对应 `webview_go_back` 等 4 个导出);`yaml_get_str`
+不封装(要求 `CoTaskMemFree` 释放,不可移植,用缓冲区版 `YAMLGet` 替代)。
 
 **枚举**:固定取值的参数都有二级命名空间枚举(`enums.go`),不必裸写字符串/数字——
 `Theme.Dark`、`FrameStyle.TitleOverlay`、`WindowLevel.Topmost`、`Backdrop.Mica`、
@@ -242,34 +176,28 @@ Linux 实现是不带后缀的 cgo 文件(`//go:build linux`)。
 ## 目录结构
 
 ```
-JadeView/
-├── include/JadeView.h            # C 头文件（上游官方版，Linux cgo 用；Windows 仅作 API 参考）
-├── lib/
-│   ├── linux_amd64/libJadeView.{a,so}
-│   ├── linux_arm64/libJadeView.{a,so}
-│   ├── windows_amd64/JadeView.dll    # MSVC 版（自含 WebView2Loader），被 go:embed 内置
-│   ├── windows_386/JadeView.dll
-│   └── windows_arm64/JadeView.dll
-├── beta/                         # 上游版本/API 文档
-├── doc.go / types.go            # 包文档 + 跨平台共享类型
+JadeViewGo/
+├── include/JadeView.h            # C 头文件（上游官方 2.4.0 版,API 参考）
+├── lib/windows_{amd64,386,arm64}/JadeView.dll   # MSVC 版（自含 WebView2Loader）,被 go:embed 内置
+├── doc.go / types.go             # 包文档 + 共享类型
 ├── enums.go / events_names.go    # 参数枚举 + 事件名常量
-├── *_windows.go                  # Windows 纯 Go 实现，共 10 个：
+├── *_windows.go                  # 纯 Go 实现,共 10 个：
 │                                 #   dll(核心+地址表) / window(生命周期+窗口) /
 │                                 #   events(事件桥) / dialog(对话框+托盘) /
 │                                 #   system(系统+YAML+JAPK) / fltcall×2 / embed×3
-├── jadeview.go window.go ...     # Linux cgo 实现（//go:build linux）
-├── jadeview_linux_{amd64,arm64}.go   # Linux 链接配置（静态 + -lxdo）
-└── example/                      # 跨平台可交互示例
+└── example/                      # 可交互示例
 ```
 
-## Windows 纯 Go 实现原理
+> 仓库内另有历史遗留的 Linux cgo 实现与 `lib/linux_*` 旧库（上游已停止更新,暂不维护）,不随 Windows 构建参与编译。
+
+## 纯 Go 实现原理
 
 1. **内置与释放**:`dll_embed_windows_*.go` 按架构 go:embed 对应的 `JadeView.dll`;
    **首次调用任一 API(或 `Preload`)时**才释放到 `%TEMP%\jadeview\<架构>-<内容哈希前8位>\`
    (内容寻址:换版本换目录,已存在文件按完整 sha256 校验、不符重写,多进程多版本并存安全;
    仅 import 本包无任何磁盘副作用)。exe 同目录的 `JadeView.dll` 优先。
 2. **加载与调用**:`syscall.NewLazyDLL` 按绝对路径惰性加载;头文件 129 个导出函数中已封装的
-   124 个经惰性代理 `jvProc.Call` 直调(`dll_windows.go` 内含完整地址表)。**加载失败时首次 API
+   128 个经惰性代理 `jvProc.Call` 直调(`dll_windows.go` 内含完整地址表)。**加载失败时首次 API
    调用会 panic**(`syscall.LazyProc` 语义)——需优雅降级的宿主在启动早期调 `Preload()`
    检查错误即可。
 3. **结构体传参**:`WebViewWindowOptions` 等 6 个 C 结构体在 Go 侧逐字段镜像
@@ -286,26 +214,18 @@ JadeView/
 
 ## 升级上游库
 
-**Windows**:把新版三个架构的 `JadeView.dll` 覆盖到 `lib/windows_*/` 即可,重新构建
-自动生效(go:embed 重新打包,运行时按新哈希释放新目录)。**不再需要 dlltool/objdump
-重做导入库**。上游若新增/修改 API,在 `dll_windows.go` 的地址表加条目并补包装函数;
-改动结构体时需重新做布局比对。
-
-**Linux**:直接用新版 `libJadeView.a`/`libJadeView.so` 覆盖 `lib/linux_*/`,重新构建。
-若上游新增了对其它系统库的依赖,记得在 `jadeview_linux_*.go` 的 `#cgo LDFLAGS` 补 `-l`。
+把新版三个架构的 `JadeView.dll` 覆盖到 `lib/windows_*/` 即可,重新构建自动生效
+(go:embed 重新打包,运行时按新哈希释放新目录)。**不再需要 dlltool/objdump 重做导入库**。
+上游若新增/修改 API,在 `dll_windows.go` 的地址表加条目并补包装函数;改动结构体时需重新做布局比对。
 
 升级后建议:
 
 1. 核对新头文件与 `dll_windows.go` 的函数清单差异(上游自动生成的头文件出过
-   `i64` 这类非 C 类型笔误,Linux cgo 侧会直接编译失败);
-2. Windows 与 Linux 各跑一遍 `go run ./example` 冒烟验证。
+   `i64` 这类非 C 类型笔误);
+2. 跑一遍 `go run ./example` 冒烟验证。
 
 ## 已知问题 / 注意事项
 
-- **上游版本 / 平台差异(重要)**:**Windows 已升级至 v2.4.0 (Build 26H03)**——三个架构的
-  `JadeView.dll` 与 2.4.0 官方头文件同步;**Linux 库维持 v2.3.x**(上游已停止更新)。由于 2.4.0
-  头文件移除了 `JadeView_set_public_key`,而 Linux cgo(`japk.go`)仍引用它,**Linux 侧当前无法编译**;
-  Windows 构建与运行不受影响。
 - **JAPK 仅限签名包(v2.4.0 破坏性变更)**:`LoadFromBytes` 只接受 v3 签名包(平台根证书链严格离线验签),
   混淆包(JPKBIN02)与运行时公钥注入(`SetPublicKey`)均已废弃。分发前端资源可临时改用协议服务目录模式(plan 1)
   或回环 HTTP(plan 2)。
@@ -317,16 +237,11 @@ JadeView/
   用 `Preload()` 在启动早期探测并优雅提示。
 - **事件槽位上限**:`On` 与 `RegisterIPCHandler` **共享** `MaxEventHandlers`=64 个槽位;
   IPC handler 无注销 API(上游头文件亦无),注册后**永久占用**一个槽位,规划通道数量时留意。
-- **Linux 托盘会崩、须先探测**:v2.3.2 (Build 26H01) 的 `tray_create` 在**没有 StatusNotifier 托盘协议**的
-  桌面(如 Debian/GNOME 默认桌面,需另装 AppIndicator 扩展)上不是返回 0,而是让库 GUI 线程
-  RUNTIME_PANIC 直接 abort(已反馈上游)。调用前先探测会话 D-Bus 上有无
-  `org.kde.StatusNotifierWatcher`,没有就跳过托盘——参考 `example/main.go` 的
-  `hasStatusNotifierWatcher`(`dbus-send` 查 `NameHasOwner`)。
 - **http(s) 页面的 IPC 跨域风险**:页面以在线/本地 http(s) URL 加载(而非 jade:// 资源方式)时
   与库不同源,IPC 可能被跨域拦截;`WebViewSettings.CORSWhitelist` 可设白名单,但库无接口查询
   其注册的临时域,无法精确加白。规避:优先用协议服务/JAPK(jade:// 同源),或
   `PostMessageWhitelist: "*"` 兜底。
-- **`jade-region-drag` 拖动区为 Windows 特性**(上游文档标注),Linux 请用 CSS `-webkit-app-region: drag`。
+- **`jade-region-drag` 拖动区为 Windows 特性**(上游文档标注)。
 - **`lib/` 下的二进制**是 JadeView 作者的第三方产物,**不在本项目 MIT 许可范围内**。
 
 ## 许可证
