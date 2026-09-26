@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	jadeview "github.com/luoxueyousheng/JadeViewGo"
+	jadeview "github.com/luoxueyousheng/JadeViewGo/v2"
 )
 
 // 前端站点（HTML/CSS/JS，含子目录）。加载方式三选一，见 onAppReady 里的 plan：

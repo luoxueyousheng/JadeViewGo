@@ -6,6 +6,12 @@
 
 对应上游 JadeView **v2.4.3 (Build 26I01)**,刷新 Windows 三架构 DLL。已核对导出表:129 个公开 API 与 v2.4.0 官方头文件完全一致(另有 4 个内部辅助导出),API 无变化,Go 侧无需改动;头文件维持 2.4.0 版。Linux 库维持 v2.3.x(上游已停止 Linux 更新)。
 
+### 修复
+
+- **模块路径升级为 `github.com/luoxueyousheng/JadeViewGo/v2`**:此前 go.mod 缺少 `/v2` 后缀,导致全部 v2.x tag 按 Go modules 规则不可安装
+  (`go get` 报 "module path must match major version"),`@latest` 也会错误解析到 v0.x。现导入路径改为
+  `import jadeview "github.com/luoxueyousheng/JadeViewGo/v2"`,示例子包为 `.../JadeViewGo/v2/example`。
+
 ## [v2.4.0] - 2026-08-27
 
 对应上游 JadeView **v2.4.0 (Build 26H03)**。Windows 三架构 DLL 与 2.4.0 官方头文件同步更新;Linux 库维持 v2.3.x(上游已停止 Linux 更新)。

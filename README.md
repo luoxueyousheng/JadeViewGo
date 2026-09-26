@@ -27,18 +27,21 @@
 作为依赖引入你的项目:
 
 ```bash
-go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
-go get github.com/luoxueyousheng/JadeViewGo@v2.4.3    # 锁定指定版本
+go get github.com/luoxueyousheng/JadeViewGo/v2@latest    # 最新正式版
+go get github.com/luoxueyousheng/JadeViewGo/v2@v2.4.3    # 锁定指定版本
 ```
 
 只想先跑一眼内置示例(示例是模块子包,可直接运行):
 
 ```bash
-go run github.com/luoxueyousheng/JadeViewGo/example@v2.4.3
+go run github.com/luoxueyousheng/JadeViewGo/v2/example@v2.4.3
 ```
 
 > 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
 > `@v2.4.3`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
+>
+> **v2.4.3 起模块路径带 `/v2` 后缀**(Go modules 主版本规范,v2.x tag 此前因此不可安装),
+> 导入路径写 `import jadeview "github.com/luoxueyousheng/JadeViewGo/v2"`。
 
 ## 前置条件与上手
 
@@ -75,7 +78,7 @@ $env:GOARCH="arm64"; go build -ldflags "-H windowsgui" -o myapp_arm64.exe .
 ```go
 package main
 
-import jadeview "github.com/luoxueyousheng/JadeViewGo"
+import jadeview "github.com/luoxueyousheng/JadeViewGo/v2"
 
 func main() {
     // 关键时序：app-ready 必须在 Init 之前注册，并在回调里判断 windowID==1 再建窗
