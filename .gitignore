@@ -18,3 +18,4 @@ Thumbs.db
 *.swp
 
 # 注意：lib/ 下的 .dll / .a / .so 是构建必需，不忽略（需随仓库提交，否则无法编译）
+.mimosa

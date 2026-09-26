@@ -2,6 +2,10 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),版本号跟随上游 JadeView。
 
+## [v2.4.3] - 2026-09-27
+
+对应上游 JadeView **v2.4.3 (Build 26I01)**,刷新 Windows 三架构 DLL。已核对导出表:129 个公开 API 与 v2.4.0 官方头文件完全一致(另有 4 个内部辅助导出),API 无变化,Go 侧无需改动;头文件维持 2.4.0 版。Linux 库维持 v2.3.x(上游已停止 Linux 更新)。
+
 ## [v2.4.0] - 2026-08-27
 
 对应上游 JadeView **v2.4.0 (Build 26H03)**。Windows 三架构 DLL 与 2.4.0 官方头文件同步更新;Linux 库维持 v2.3.x(上游已停止 Linux 更新)。

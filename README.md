@@ -4,7 +4,7 @@
 
 > ⚠️ **v2.4.0 破坏性变更**:JAPK 包从此**只能加载带签名的资源包**(v3 签名协议,平台根证书链严格离线验签),混淆包与公钥注入机制(`SetPublicKey`)均已移除。详见[已知问题](#已知问题--注意事项)与 [CHANGELOG](CHANGELOG.md)。
 
-当前对应上游 **v2.4.0 (Build 26H03)**;要求 **Go 1.23+**。
+当前对应上游 **v2.4.3 (Build 26I01)**;要求 **Go 1.23+**。
 
 ## 目录
 
@@ -28,17 +28,17 @@
 
 ```bash
 go get github.com/luoxueyousheng/JadeViewGo@latest    # 最新正式版
-go get github.com/luoxueyousheng/JadeViewGo@v2.4.0    # 锁定指定版本
+go get github.com/luoxueyousheng/JadeViewGo@v2.4.3    # 锁定指定版本
 ```
 
 只想先跑一眼内置示例(示例是模块子包,可直接运行):
 
 ```bash
-go run github.com/luoxueyousheng/JadeViewGo/example@v2.4.0
+go run github.com/luoxueyousheng/JadeViewGo/example@v2.4.3
 ```
 
 > 若 `@latest` 一时解析不到刚发布的 tag(官方 proxy 索引有几分钟延迟),改用精确版本号
-> `@v2.4.0`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
+> `@v2.4.3`,或加 `GOPROXY=https://proxy.golang.org,direct` 显式拉取。
 
 ## 前置条件与上手
 
