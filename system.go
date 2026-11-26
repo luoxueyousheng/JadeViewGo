@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && amd64 && jadeview_cgo && cgo
 
 package jadeview
 
@@ -84,8 +84,8 @@ func GetPrinterList() (string, int32, bool) {
 // --- 打印 ---
 
 // Print 打开 WebView2 内置打印对话框。
-func Print(windowID uint32) bool {
-	return C.jade_print(C.uint32_t(windowID)) == 1
+func Print(webviewID uint32) bool {
+	return C.jade_print(C.uint32_t(webviewID)) == 1
 }
 
 // PrintFile 用系统关联程序打印文件（Windows=ShellExecute "print"，Linux=CUPS lp）。
@@ -158,13 +158,13 @@ func UnregisterFileAssociation(extension string) bool {
 // --- 安全资源 / 协议服务 ---
 
 // RegisterResource 注册本地文件为安全资源，返回 jade:// URL。
-// windowID=0 表示全局；ttlSeconds=0 表示永不过期。
-func RegisterResource(path string, windowID, ttlSeconds uint32) (string, bool) {
+// webviewID=0 表示全局；ttlSeconds=0 使用默认 6 秒，^uint32(0) 表示永不过期。
+func RegisterResource(path string, webviewID, ttlSeconds uint32) (string, bool) {
 	pool := &cstrPool{}
 	defer pool.free()
 	cp := pool.s(path)
 	return bufCallSize(512, func(buf *C.char, n C.size_t) C.int32_t {
-		return C.register_resource(cp, C.uint32_t(windowID), C.uint32_t(ttlSeconds), buf, n)
+		return C.register_resource(cp, C.uint32_t(webviewID), C.uint32_t(ttlSeconds), buf, n)
 	})
 }
 
@@ -175,18 +175,18 @@ func UnregisterResource(tokenOrURL string) bool {
 }
 
 // ClearWindowResources 清理指定窗口的所有已注册资源，返回清理数量。
-func ClearWindowResources(windowID uint32) int32 {
-	return int32(C.clear_window_resources(C.uint32_t(windowID)))
+func ClearWindowResources(webviewID uint32) int32 {
+	return int32(C.clear_window_resources(C.uint32_t(webviewID)))
 }
 
 // GetFileIcon 提取任意路径的图标为 PNG 注册为 jade:// 资源，返回 URL。
-// size 目标边长（16/32/48/64/128/256，<=0 取 48）；windowID=0 全局；ttlSeconds=0 默认。
-func GetFileIcon(path string, size int, windowID, ttlSeconds uint32) (string, bool) {
+// size 目标边长（16/32/48/64/128/256，<=0 取 48）；webviewID=0 全局；ttlSeconds=0 使用默认值。
+func GetFileIcon(path string, size int, webviewID, ttlSeconds uint32) (string, bool) {
 	pool := &cstrPool{}
 	defer pool.free()
 	cp := pool.s(path)
 	return bufCallSize(512, func(buf *C.char, n C.size_t) C.int32_t {
-		return C.get_file_icon(cp, C.int32_t(size), C.uint32_t(windowID), C.uint32_t(ttlSeconds), buf, n)
+		return C.get_file_icon(cp, C.int32_t(size), C.uint32_t(webviewID), C.uint32_t(ttlSeconds), buf, n)
 	})
 }
 

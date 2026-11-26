@@ -3,7 +3,7 @@ package jadeview
 // 固定取值的输入参数枚举，按用途分组为二级命名空间（Windows/Linux 两侧共用）：
 //
 //	jadeview.Theme.Dark            // 窗口主题
-//	jadeview.FrameStyle.TitleOverlay
+//	jadeview.TitleBarStyle.Overlay
 //	jadeview.Backdrop.Mica
 //
 // 取值与 include/JadeView.h 注释及官方文档一致；事件名见 events_names.go。
@@ -15,13 +15,10 @@ var Theme = struct {
 	System string // 跟随 Windows 个性化设置（推荐默认）
 }{"Light", "Dark", "System"}
 
-// FrameStyle 窗口边框样式（WindowOptions.FrameStyle / SetFrameStyle）。
-var FrameStyle = struct {
-	Normal       string // 系统边框 + 标题栏
-	NoTitlebar   string // 保留边框，去掉标题栏（需自绘标题栏与控制按钮）
-	Borderless   string // 完全无边框（启动页/异形窗口）
-	TitleOverlay string // 保留边框 + 无标题栏 + 库内置右上角控制按钮（Windows，推荐）
-}{"normal", "no-titlebar", "borderless", "title-overlay"}
+// TitleBarStyle 是 v3 窗口标题栏样式，与 NoFrame 独立。
+var TitleBarStyle = struct {
+	Default, Hidden, Overlay string
+}{"default", "hidden", "BarOverlay"}
 
 // WindowLevel 窗口层级（SetLevel）。
 var WindowLevel = struct {
@@ -55,23 +52,6 @@ var ProgressState = struct {
 	Paused        int // 暂停（黄色）
 	Error         int // 出错（红色）
 	Indeterminate int // 不确定进度（跑马灯）
-}{0, 1, 2, 3, 4}
-
-// TrayItem 托盘菜单项类型（TrayMenuItem.Type）。
-var TrayItem = struct {
-	Normal  int // 普通项
-	Submenu int // 子菜单
-	Divider int // 分隔线
-	Group   int // 分组
-}{0, 1, 2, 3}
-
-// MenuKind 右键/上下文菜单项类型（MenuItemCreate 的 kind 参数）。
-var MenuKind = struct {
-	Normal    int // 普通命令
-	Separator int // 分隔线
-	Checkbox  int // 复选框
-	Radio     int // 单选
-	Submenu   int // 子菜单
 }{0, 1, 2, 3, 4}
 
 // DialogProp 文件对话框属性（FileDialogParams.Properties 的 JSON 数组元素）。

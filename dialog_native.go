@@ -1,11 +1,10 @@
-//go:build windows
+//go:build windows || (linux && amd64 && !jadeview_cgo)
 
 package jadeview
 
 import (
 	"runtime"
 	"sync"
-	"syscall"
 	"unsafe"
 )
 
@@ -131,49 +130,8 @@ func ShowErrorBox(windowID uint32, title, content string) bool {
 	return i32(r) == 1
 }
 
-// --- 右键/上下文菜单项 ---
-
-// MenuItemCreate 创建菜单项，返回 menu_id（0=失败）。
-//   - kind: 见 MenuKind* 常量
-//   - parentMenuID: 0=顶级，>0=加入指定子菜单
-//   - itemID: 用户自定义 ID，点击时通过 "menu-item-clicked" 事件回传
-func MenuItemCreate(label string, kind int, parentMenuID uint32, itemID int) uint32 {
-	pool := &cstrs{}
-	r, _, _ := procMenuItemCreate.Call(uintptr(unsafe.Pointer(pool.p(label))),
-		uintptr(uint32(int32(kind))), uintptr(parentMenuID), uintptr(uint32(int32(itemID))))
-	runtime.KeepAlive(pool)
-	return uint32(r)
-}
-
-func MenuItemSetEnabled(menuID uint32, enabled bool) bool {
-	r, _, _ := procMenuItemSetEnabled.Call(uintptr(menuID), b2u(enabled))
-	return i32(r) == 1
-}
-
-func MenuItemSetChecked(menuID uint32, checked bool) bool {
-	r, _, _ := procMenuItemSetChecked.Call(uintptr(menuID), b2u(checked))
-	return i32(r) == 1
-}
-
-func MenuItemDestroy(menuID uint32) bool {
-	r, _, _ := procMenuItemDestroy.Call(uintptr(menuID))
-	return i32(r) == 1
-}
-
-// SetContextMenuItems 设置当前右键菜单要显示的顶级菜单项（在 "context-menu" 事件回调中调用）。
-func SetContextMenuItems(windowID uint32, menuIDs []uint32) bool {
-	if len(menuIDs) == 0 {
-		r, _, _ := procSetContextMenuItems.Call(uintptr(windowID), 0, 0)
-		return i32(r) == 1
-	}
-	r, _, _ := procSetContextMenuItems.Call(uintptr(windowID),
-		uintptr(unsafe.Pointer(&menuIDs[0])), uintptr(uint32(int32(len(menuIDs)))))
-	runtime.KeepAlive(menuIDs)
-	return i32(r) == 1
-}
-
 // --- 异步对话框回调桥 ---
-// 完成后经 void(const char*) 回调回传结果 JSON。固定槽位池 + 惰性 NewCallback 跳板。
+// 完成后经 void(const char*) 回调回传结果 JSON。固定槽位池 + 惰性原生跳板。
 // 该回调类型无 JADEVIEW_CALL 修饰，386 下为 cdecl，用 NewCallbackCDecl（64 位与 NewCallback 等价）。
 
 var (
@@ -186,7 +144,7 @@ var (
 func dlgTramp(slot int) uintptr {
 	if dlgTramps[slot] == 0 {
 		s := slot
-		dlgTramps[slot] = syscall.NewCallbackCDecl(func(result uintptr) uintptr {
+		dlgTramps[slot] = newNativeCDeclCallback(func(result uintptr) uintptr {
 			goDialogDispatch(s, result)
 			return 0
 		})
@@ -280,16 +238,6 @@ func ShowMessageBoxAsync(p MessageBoxParams, handler DialogResultHandler) bool {
 
 // --- 托盘 ---
 
-// cTrayMenuItemDesc 是 C TrayMenuItemDesc 的逐字段镜像。
-type cTrayMenuItemDesc struct {
-	itemType  int32
-	key       *byte
-	label     *byte
-	parentKey *byte
-	disabled  int32
-	dangerous int32
-}
-
 // TrayCreate 创建托盘图标，返回 tray_id（0=失败）。
 func TrayCreate() uint32 {
 	r, _, _ := procTrayCreate.Call()
@@ -328,30 +276,5 @@ func TraySetIconFromData(trayID uint32, data []byte) bool {
 	r, _, _ := procTraySetIconFromData.Call(uintptr(trayID),
 		uintptr(unsafe.Pointer(&data[0])), uintptr(uint32(len(data))))
 	runtime.KeepAlive(data)
-	return i32(r) == 1
-}
-
-// TraySetMenu 用扁平表设置托盘根菜单（库内深拷贝字符串）。空切片表示清除菜单。
-func TraySetMenu(trayID uint32, items []TrayMenuItem) bool {
-	if len(items) == 0 {
-		r, _, _ := procTraySetMenuItems.Call(uintptr(trayID), 0, 0)
-		return i32(r) == 1
-	}
-	pool := &cstrs{}
-	arr := make([]cTrayMenuItemDesc, len(items))
-	for i, it := range items {
-		arr[i] = cTrayMenuItemDesc{
-			itemType:  int32(it.Type),
-			key:       pool.p(it.Key),
-			label:     pool.p(it.Label),
-			parentKey: pool.p(it.ParentKey),
-			disabled:  bi32(it.Disabled),
-			dangerous: bi32(it.Dangerous),
-		}
-	}
-	r, _, _ := procTraySetMenuItems.Call(uintptr(trayID),
-		uintptr(unsafe.Pointer(&arr[0])), uintptr(uint32(len(arr))))
-	runtime.KeepAlive(pool)
-	runtime.KeepAlive(arr)
 	return i32(r) == 1
 }

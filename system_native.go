@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows || (linux && amd64 && !jadeview_cgo)
 
 package jadeview
 
@@ -91,8 +91,8 @@ func GetPrinterList() (string, int32, bool) {
 // --- 打印 ---
 
 // Print 打开 WebView2 内置打印对话框。
-func Print(windowID uint32) bool {
-	r, _, _ := procJadePrint.Call(uintptr(windowID))
+func Print(webviewID uint32) bool {
+	r, _, _ := procJadePrint.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
@@ -181,13 +181,13 @@ func UnregisterFileAssociation(extension string) bool {
 // --- 安全资源 / 协议服务 ---
 
 // RegisterResource 注册本地文件为安全资源，返回 jade:// URL。
-// windowID=0 表示全局；ttlSeconds=0 表示永不过期。
-func RegisterResource(path string, windowID, ttlSeconds uint32) (string, bool) {
+// webviewID=0 表示全局；ttlSeconds=0 使用默认 6 秒，^uint32(0) 表示永不过期。
+func RegisterResource(path string, webviewID, ttlSeconds uint32) (string, bool) {
 	pool := &cstrs{}
 	cp := pool.p(path)
 	s, ok := bufCallSize(512, func(buf unsafe.Pointer, size uintptr) int32 {
 		r, _, _ := procRegisterResource.Call(uintptr(unsafe.Pointer(cp)),
-			uintptr(windowID), uintptr(ttlSeconds), uintptr(buf), size)
+			uintptr(webviewID), uintptr(ttlSeconds), uintptr(buf), size)
 		return i32(r)
 	})
 	runtime.KeepAlive(pool)
@@ -202,19 +202,19 @@ func UnregisterResource(tokenOrURL string) bool {
 }
 
 // ClearWindowResources 清理指定窗口的所有已注册资源，返回清理数量。
-func ClearWindowResources(windowID uint32) int32 {
-	r, _, _ := procClearWindowRes.Call(uintptr(windowID))
+func ClearWindowResources(webviewID uint32) int32 {
+	r, _, _ := procClearWindowRes.Call(uintptr(webviewID))
 	return i32(r)
 }
 
 // GetFileIcon 提取任意路径的图标为 PNG 注册为 jade:// 资源，返回 URL。
-// size 目标边长（16/32/48/64/128/256，<=0 取 48）；windowID=0 全局；ttlSeconds=0 默认。
-func GetFileIcon(path string, size int, windowID, ttlSeconds uint32) (string, bool) {
+// size 目标边长（16/32/48/64/128/256，<=0 取 48）；webviewID=0 全局；ttlSeconds=0 使用默认值。
+func GetFileIcon(path string, size int, webviewID, ttlSeconds uint32) (string, bool) {
 	pool := &cstrs{}
 	cp := pool.p(path)
 	s, ok := bufCallSize(512, func(buf unsafe.Pointer, bufSize uintptr) int32 {
 		r, _, _ := procGetFileIcon.Call(uintptr(unsafe.Pointer(cp)), uintptr(uint32(int32(size))),
-			uintptr(windowID), uintptr(ttlSeconds), uintptr(buf), bufSize)
+			uintptr(webviewID), uintptr(ttlSeconds), uintptr(buf), bufSize)
 		return i32(r)
 	})
 	runtime.KeepAlive(pool)
@@ -393,7 +393,7 @@ func YAMLDeleteFile(fileName string) int32 {
 
 // --- JAPK 资源包：签名校验与加载 ---
 
-// LoadFromBytes 从内存加载 JAPK 文件（支持 v2 签名包与混淆包）。
+// LoadFromBytes 从内存加载 JAPK 文件（仅支持通过原生验证的签名包）。
 //   - 已设公钥：必须是签名包，验签后加载；
 //   - 未设公钥：仅支持混淆包（JPKBIN02）。
 //

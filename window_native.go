@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows || (linux && amd64 && !jadeview_cgo)
 
 package jadeview
 
@@ -7,53 +7,60 @@ import (
 	"unsafe"
 )
 
-// cWindowOptions 是 C WebViewWindowOptions 的逐字段镜像（布局已双端比对验证）。
 type cWindowOptions struct {
-	title             *byte
-	width             int32
-	height            int32
-	resizable         int32
-	frameStyle        *byte
-	transparent       int32
-	backgroundColor   *byte
-	alwaysOnTop       int32
-	theme             *byte
-	maximized         int32
-	maximizable       int32
-	minimizable       int32
-	x                 int32
-	y                 int32
-	minWidth          int32
-	minHeight         int32
-	maxWidth          int32
-	maxHeight         int32
-	fullscreen        int32
-	focus             int32
-	hideWindow        int32
-	usePageIcon       int32
-	contentProtection int32
-	autoSaveState     int32
-	skipTaskbar       int32
-	noActivate        int32
+	structSize         uint32
+	abiVersion         uint32
+	title              *byte
+	width              int32
+	height             int32
+	resizable          int32
+	noframe            int32
+	titleBarStyle      *byte
+	transparent        int32
+	backgroundColor    *byte
+	alwaysOnTop        int32
+	theme              *byte
+	maximized          int32
+	maximizable        int32
+	minimizable        int32
+	x                  int32
+	y                  int32
+	minWidth           int32
+	minHeight          int32
+	maxWidth           int32
+	maxHeight          int32
+	fullscreen         int32
+	focus              int32
+	hideWindow         int32
+	usePageIcon        int32
+	skipTaskbar        int32
+	noActivate         int32
+	backgroundMaterial *byte
+	titlebarBack       int32
+	titlebarRefresh    int32
+	titlebarIcon       int32
 }
-
-// cWebViewSettings 是 C WebViewSettings 的逐字段镜像。
-type cWebViewSettings struct {
-	autoplay               int32
-	backgroundThrottling   int32
-	allowRightClick        int32
-	ua                     *byte
-	preloadJS              *byte
-	allowFullscreen        int32
-	postmessageWhitelist   *byte
-	corsWhitelist          *byte
-	autofill               int32
-	generalAutofillEnabled int32
-	incognito              int32
-	disableClipboard       int32
-	proxyURL               *byte
-	focused                int32
-	profileName            *byte // Windows WebView2 Profile 名称，多窗口 Cookie/存储/缓存隔离
+type cWebViewSettingsFields struct {
+	structSize                uint32
+	abiVersion                uint32
+	autoplay                  int32
+	backgroundThrottling      int32
+	allowRightClick           int32
+	userAgent                 *byte
+	preloadJS                 *byte
+	allowFullscreen           int32
+	postmessageAllowedOrigins *byte
+	corsAllowedOrigins        *byte
+	passwordAutofill          int32
+	formAutofill              int32
+	incognito                 int32
+	disableClipboard          int32
+	proxyURL                  *byte
+	focused                   int32
+	profileName               *byte
+	devtools                  int32
+	zoomFactor                float64
+	backgroundColor           *byte
 }
 
 func bi32(b bool) int32 {
@@ -63,148 +70,150 @@ func bi32(b bool) int32 {
 	return 0
 }
 
-func (o *WindowOptions) toC(pool *cstrs) cWindowOptions {
-	return cWindowOptions{
-		title:             pool.p(o.Title),
-		width:             int32(o.Width),
-		height:            int32(o.Height),
-		resizable:         bi32(o.Resizable),
-		frameStyle:        pool.p(o.FrameStyle),
-		transparent:       bi32(o.Transparent),
-		backgroundColor:   pool.p(o.BackgroundColor),
-		alwaysOnTop:       bi32(o.AlwaysOnTop),
-		theme:             pool.p(o.Theme),
-		maximized:         bi32(o.Maximized),
-		maximizable:       bi32(o.Maximizable),
-		minimizable:       bi32(o.Minimizable),
-		x:                 int32(o.X),
-		y:                 int32(o.Y),
-		minWidth:          int32(o.MinWidth),
-		minHeight:         int32(o.MinHeight),
-		maxWidth:          int32(o.MaxWidth),
-		maxHeight:         int32(o.MaxHeight),
-		fullscreen:        bi32(o.Fullscreen),
-		focus:             bi32(o.Focus),
-		hideWindow:        bi32(o.HideWindow),
-		usePageIcon:       bi32(o.UsePageIcon),
-		contentProtection: bi32(o.ContentProtection),
-		autoSaveState:     bi32(o.AutoSaveState),
-		skipTaskbar:       bi32(o.SkipTaskbar),
-		noActivate:        bi32(o.NoActivate),
+var (
+	procWindowOptionsDefault   = np("window_options_default")
+	procWebViewSettingsDefault = np("webview_settings_default")
+	procCreateEmptyWindow      = np("create_window")
+)
+
+func (o *WindowOptions) toC(pool *cstrs) *cWindowOptions {
+	if o == nil {
+		return nil
 	}
+	c := new(cWindowOptions)
+	r, _, _ := procWindowOptionsDefault.Call(uintptr(unsafe.Pointer(c)), unsafe.Sizeof(*c))
+	if i32(r) != 0 {
+		panic("JadeView: WindowOptionsDefault failed")
+	}
+	c.title = pool.p(o.Title)
+	c.width = int32(o.Width)
+	c.height = int32(o.Height)
+	c.resizable = bi32(o.Resizable)
+	c.noframe = bi32(o.NoFrame)
+	c.titleBarStyle = pool.p(o.TitleBarStyle)
+	c.transparent = bi32(o.Transparent)
+	c.backgroundColor = pool.p(o.BackgroundColor)
+	c.alwaysOnTop = bi32(o.AlwaysOnTop)
+	c.theme = pool.p(o.Theme)
+	c.maximized = bi32(o.Maximized)
+	c.maximizable = bi32(o.Maximizable)
+	c.minimizable = bi32(o.Minimizable)
+	c.x = int32(o.X)
+	c.y = int32(o.Y)
+	c.minWidth = int32(o.MinWidth)
+	c.minHeight = int32(o.MinHeight)
+	c.maxWidth = int32(o.MaxWidth)
+	c.maxHeight = int32(o.MaxHeight)
+	c.fullscreen = bi32(o.Fullscreen)
+	c.focus = bi32(o.Focus)
+	c.hideWindow = bi32(o.HideWindow)
+	c.usePageIcon = bi32(o.UsePageIcon)
+	c.skipTaskbar = bi32(o.SkipTaskbar)
+	c.noActivate = bi32(o.NoActivate)
+	c.backgroundMaterial = pool.p(o.BackgroundMaterial)
+	c.titlebarBack = bi32(!o.HideTitlebarBack)
+	c.titlebarRefresh = bi32(!o.HideTitlebarRefresh)
+	c.titlebarIcon = bi32(!o.HideTitlebarIcon)
+	return c
+}
+func (s *WebViewSettings) toC(pool *cstrs) *cWebViewSettings {
+	if s == nil {
+		return nil
+	}
+	c := new(cWebViewSettings)
+	r, _, _ := procWebViewSettingsDefault.Call(uintptr(unsafe.Pointer(c)), unsafe.Sizeof(*c))
+	if i32(r) != 0 {
+		panic("JadeView: WebViewSettingsDefault failed")
+	}
+	c.autoplay = bi32(s.Autoplay)
+	c.backgroundThrottling = bi32(s.BackgroundThrottling)
+	c.allowRightClick = bi32(s.AllowRightClick)
+	c.userAgent = pool.p(s.UserAgent)
+	c.preloadJS = pool.p(s.PreloadJS)
+	c.allowFullscreen = bi32(s.AllowFullscreen)
+	c.postmessageAllowedOrigins = pool.p(s.PostMessageAllowedOrigins)
+	c.corsAllowedOrigins = pool.p(s.CORSAllowedOrigins)
+	c.passwordAutofill = bi32(s.PasswordAutofill)
+	c.formAutofill = bi32(s.FormAutofill)
+	c.incognito = bi32(s.Incognito)
+	c.disableClipboard = bi32(s.DisableClipboard)
+	c.proxyURL = pool.p(s.ProxyURL)
+	c.focused = bi32(s.Focused)
+	c.profileName = pool.p(s.ProfileName)
+	c.devtools = int32(s.DevTools)
+	c.zoomFactor = s.ZoomFactor
+	c.backgroundColor = pool.p(s.BackgroundColor)
+	return c
 }
 
-func (s *WebViewSettings) toC(pool *cstrs) cWebViewSettings {
-	return cWebViewSettings{
-		autoplay:               bi32(s.Autoplay),
-		backgroundThrottling:   bi32(s.BackgroundThrottling),
-		allowRightClick:        bi32(s.AllowRightClick),
-		ua:                     pool.p(s.UserAgent),
-		preloadJS:              pool.p(s.PreloadJS),
-		allowFullscreen:        bi32(s.AllowFullscreen),
-		postmessageWhitelist:   pool.p(s.PostMessageWhitelist),
-		corsWhitelist:          pool.p(s.CORSWhitelist),
-		autofill:               bi32(s.Autofill),
-		generalAutofillEnabled: bi32(s.GeneralAutofillEnabled),
-		incognito:              bi32(s.Incognito),
-		disableClipboard:       bi32(s.DisableClipboard),
-		proxyURL:               pool.p(s.ProxyURL),
-		focused:                bi32(s.Focused),
-		profileName:            pool.p(s.ProfileName),
-	}
-}
-
-// CreateWindow 创建一个 WebView 窗口，返回 window_id（0 表示失败）。
-//
-//   - url      : 初始地址（http(s):// 或自定义协议）
-//   - parentID : 父窗口 ID，0 表示无父窗口
-//   - opts     : 窗口选项，nil 则用 DefaultWindowOptions()
-//   - settings : WebView 高级设置，nil 则全用默认
+// CreateWindow 创建 Window 和默认 WebView，返回 Window ID。nil 配置使用原生默认值。
 func CreateWindow(url string, parentID uint32, opts *WindowOptions, settings *WebViewSettings) uint32 {
 	pool := &cstrs{}
-	if opts == nil {
-		d := DefaultWindowOptions()
-		opts = &d
-	}
-	if settings == nil {
-		settings = &WebViewSettings{}
-	}
-	copts := opts.toC(pool)
-	csettings := settings.toC(pool)
-
-	r, _, _ := procCreateWebviewWindow.Call(
-		uintptr(unsafe.Pointer(pool.p(url))),
-		uintptr(parentID),
-		uintptr(unsafe.Pointer(&copts)),
-		uintptr(unsafe.Pointer(&csettings)),
-	)
+	co, cs, f := opts.toC(pool), settings.toC(pool), opts.features()
+	r, _, _ := procCreateWebviewWindow.Call(uintptr(unsafe.Pointer(pool.p(url))), uintptr(parentID), uintptr(unsafe.Pointer(co)), uintptr(unsafe.Pointer(cs)), uintptr(unsafe.Pointer(f)))
 	runtime.KeepAlive(pool)
-	runtime.KeepAlive(&copts)
-	runtime.KeepAlive(&csettings)
 	return uint32(r)
 }
 
-// CreateBorderlessWindow 创建独立无边框 WebView 窗口，返回 window_id。
-func CreateBorderlessWindow(url string, settings *WebViewSettings) uint32 {
+// CreateEmptyWindow 创建不带 WebView 的原生 Window。
+func CreateEmptyWindow(parentID uint32, opts *WindowOptions) uint32 {
 	pool := &cstrs{}
-	if settings == nil {
-		settings = &WebViewSettings{}
-	}
-	csettings := settings.toC(pool)
-	r, _, _ := procCreateBorderlessWindow.Call(
-		uintptr(unsafe.Pointer(pool.p(url))),
-		uintptr(unsafe.Pointer(&csettings)),
-	)
+	co, f := opts.toC(pool), opts.features()
+	r, _, _ := procCreateEmptyWindow.Call(uintptr(parentID), uintptr(unsafe.Pointer(co)), uintptr(unsafe.Pointer(f)))
 	runtime.KeepAlive(pool)
-	runtime.KeepAlive(&csettings)
 	return uint32(r)
+}
+
+func (o *WindowOptions) features() *cWindowFeatures {
+	if o == nil || (!o.ContentProtection && !o.AutoSaveState) {
+		return nil
+	}
+	return &cWindowFeatures{size: uint32(unsafe.Sizeof(cWindowFeatures{})), abi: ABIVersion, contentProtection: bi32(o.ContentProtection), autoSaveState: bi32(o.AutoSaveState)}
+}
+
+type cWindowFeatures struct {
+	size, abi                        uint32
+	contentProtection, autoSaveState int32
+	splash                           *byte
 }
 
 // --- 常用窗口操作（薄封装） ---
 
-func Navigate(windowID uint32, url, headersJSON string) bool {
+func Navigate(webviewID uint32, url, headersJSON string) bool {
 	pool := &cstrs{}
-	r, _, _ := procNavigateToURL.Call(uintptr(windowID),
+	r, _, _ := procNavigateToURL.Call(uintptr(webviewID),
 		uintptr(unsafe.Pointer(pool.p(url))), uintptr(unsafe.Pointer(pool.p(headersJSON))))
 	runtime.KeepAlive(pool)
 	return i32(r) == 1
 }
 
-func Reload(windowID uint32) bool {
-	r, _, _ := procReloadWebviewWindow.Call(uintptr(windowID))
+func Reload(webviewID uint32) bool {
+	r, _, _ := procReloadWebviewWindow.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
 // GoBack 导航历史后退（原生后退）。
-func GoBack(windowID uint32) bool {
-	r, _, _ := procWebviewGoBack.Call(uintptr(windowID))
+func GoBack(webviewID uint32) bool {
+	r, _, _ := procWebviewGoBack.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
 // GoForward 导航历史前进（原生前进）。
-func GoForward(windowID uint32) bool {
-	r, _, _ := procWebviewGoForward.Call(uintptr(windowID))
+func GoForward(webviewID uint32) bool {
+	r, _, _ := procWebviewGoForward.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
 // CanGoBack 查询当前页面能否后退。
-func CanGoBack(windowID uint32) bool {
-	r, _, _ := procWebviewCanGoBack.Call(uintptr(windowID))
+func CanGoBack(webviewID uint32) bool {
+	r, _, _ := procWebviewCanGoBack.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
 // CanGoForward 查询当前页面能否前进。
-func CanGoForward(windowID uint32) bool {
-	r, _, _ := procWebviewCanGoForward.Call(uintptr(windowID))
+func CanGoForward(webviewID uint32) bool {
+	r, _, _ := procWebviewCanGoForward.Call(uintptr(webviewID))
 	return i32(r) == 1
-}
-
-// ExecuteJavaScript 执行 JS，返回一个唯一 id；结果通过 "javascript-result" 事件异步返回。
-func ExecuteJavaScript(windowID uint32, script string) int32 {
-	pool := &cstrs{}
-	r, _, _ := procExecuteJavascript.Call(uintptr(windowID), uintptr(unsafe.Pointer(pool.p(script))))
-	runtime.KeepAlive(pool)
-	return i32(r)
 }
 
 func SetTitle(windowID uint32, title string) bool {
@@ -278,7 +287,7 @@ func WindowCount() uint32 {
 //   - singleInstance: 是否启用单实例
 //
 // 返回 true 表示成功。注意：宿主仍应在 jade_on("app-ready", ...) 回调里
-// 判断 window_id 以确认初始化结果（详见头文件说明）。
+// 解析 JSON 的 ok 字段；回调来源 ID 为 0。
 func Init(enableDevmod bool, logPath, dataDir, appName, appSignature string, singleInstance bool) bool {
 	pool := &cstrs{}
 	r, _, _ := procJadeViewInit.Call(
@@ -315,11 +324,10 @@ func Exit() {
 	procJadeviewExit.Call()
 }
 
-// ExitWait 清理所有窗口并等待事件循环与 JadeView 后台线程（GUI/回调/日志/托盘/单实例）
-// 退出完成，最多等待 timeoutMs 毫秒。相比 Exit，本函数会等待运行时卸载完毕，
-// 便于可靠释放 DLL 与后续重复初始化（2.4.0 新增）。
-func ExitWait(timeoutMs uint32) {
-	procJadeviewExitWait.Call(uintptr(timeoutMs))
+// ExitWait 发起退出并等待原生运行时收尾，返回库状态码。
+func ExitWait(timeoutMs uint32) int32 {
+	r, _, _ := procJadeviewExitWait.Call(uintptr(timeoutMs))
+	return i32(r)
 }
 
 // --- 窗口状态查询 ---
@@ -353,22 +361,22 @@ func GetWindowBounds(windowID uint32) (string, bool) {
 }
 
 // GetWebViewURL 返回当前 WebView 地址。
-func GetWebViewURL(windowID uint32) (string, bool) {
+func GetWebViewURL(webviewID uint32) (string, bool) {
 	return bufCallInt(2048, func(buf unsafe.Pointer, size int32) int32 {
-		r, _, _ := procGetWebviewURL.Call(uintptr(windowID), uintptr(buf), uintptr(uint32(size)))
+		r, _, _ := procGetWebviewURL.Call(uintptr(webviewID), uintptr(buf), uintptr(uint32(size)))
 		return i32(r)
 	})
 }
 
-// GetWindowHWND 返回窗口原生句柄（beta.9 起支持所有方法创建的窗口）。
+// GetWindowHWND 返回窗口原生句柄。
 func GetWindowHWND(windowID uint32) uintptr {
 	r, _, _ := procGetWindowHwnd.Call(uintptr(windowID))
 	return r
 }
 
-// GetWindowID 根据 HWND 反查窗口 ID（beta.9 新增），0 表示未找到。
+// GetWindowID 根据 HWND 反查窗口 ID，0 表示未找到。
 func GetWindowID(hwnd uintptr) uint32 {
-	r, _, _ := procGetWindowID.Call(uintptr(uint32(hwnd)))
+	r, _, _ := procGetWindowID.Call(hwnd)
 	return uint32(r)
 }
 
@@ -427,13 +435,13 @@ func SetContentProtection(windowID uint32, on bool) bool {
 
 // SetZoom 设置 WebView 缩放级别。
 // double 参数无法经整数寄存器传递（x64/arm64 走浮点寄存器），见 fltcall_windows_*.go。
-func SetZoom(windowID uint32, level float64) bool {
-	return callF64I32(procSetWebviewZoom, windowID, level) == 1
+func SetZoom(webviewID uint32, level float64) bool {
+	return callF64I32(procSetWebviewZoom, webviewID, level) == 1
 }
 
-func SetFrameStyle(windowID uint32, frameStyle string) bool {
+func SetWindowFrame(windowID uint32, titleBarStyle string) bool {
 	pool := &cstrs{}
-	r, _, _ := procSetWindowFrameStyle.Call(uintptr(windowID), uintptr(unsafe.Pointer(pool.p(frameStyle))))
+	r, _, _ := procSetWindowFrame.Call(uintptr(windowID), uintptr(unsafe.Pointer(pool.p(titleBarStyle))))
 	runtime.KeepAlive(pool)
 	return i32(r) == 1
 }
@@ -476,43 +484,54 @@ func RequestRedraw(windowID uint32) bool {
 	return i32(r) == 1
 }
 
-// SetTitlebarOverlayStyle 设置标题栏覆盖层样式（Windows only）。height<=0 不修改高度。
-func SetTitlebarOverlayStyle(windowID uint32, height int, iconColorHex, hoverBgHex string) bool {
+var procSetTitlebarStyle = np("set_titlebar_style")
+var procSetTitlebarComponents = np("set_titlebar_components")
+
+// SetTitlebarStyle 更新 Windows 标题栏颜色和高度。
+func SetTitlebarStyle(windowID uint32, style TitlebarStyleOptions) bool {
 	pool := &cstrs{}
-	r, _, _ := procSetTitlebarOverlay.Call(uintptr(windowID), uintptr(uint32(int32(height))),
-		uintptr(unsafe.Pointer(pool.p(iconColorHex))), uintptr(unsafe.Pointer(pool.p(hoverBgHex))))
+	r, _, _ := procSetTitlebarStyle.Call(uintptr(windowID), uintptr(uint32(int32(style.Height))),
+		uintptr(unsafe.Pointer(pool.p(style.BackgroundColor))), uintptr(unsafe.Pointer(pool.p(style.ForegroundColor))),
+		uintptr(unsafe.Pointer(pool.p(style.ButtonBackgroundColor))), uintptr(unsafe.Pointer(pool.p(style.ButtonHoverBackgroundColor))),
+		uintptr(unsafe.Pointer(pool.p(style.ButtonHoverForegroundColor))))
 	runtime.KeepAlive(pool)
+	return i32(r) == 1
+}
+
+// SetTitlebarComponents 一次更新五个 Windows 标题栏开关。
+func SetTitlebarComponents(windowID uint32, back, refresh, icon, minimize, maximize bool) bool {
+	r, _, _ := procSetTitlebarComponents.Call(uintptr(windowID), b2u(back), b2u(refresh), b2u(icon), b2u(minimize), b2u(maximize))
 	return i32(r) == 1
 }
 
 // --- IPC / DevTools / 其它 ---
 
 // SendIPCMessage 向前端发送 IPC 消息。
-func SendIPCMessage(windowID uint32, messageType, messageContent string) bool {
+func SendIPCMessage(webviewID uint32, messageType, messageContent string) bool {
 	pool := &cstrs{}
-	r, _, _ := procSendIPCMessage.Call(uintptr(windowID),
+	r, _, _ := procSendIPCMessage.Call(uintptr(webviewID),
 		uintptr(unsafe.Pointer(pool.p(messageType))), uintptr(unsafe.Pointer(pool.p(messageContent))))
 	runtime.KeepAlive(pool)
 	return i32(r) == 1
 }
 
-func OpenDevtools(windowID uint32) bool {
-	r, _, _ := procOpenDevtools.Call(uintptr(windowID))
+func OpenDevtools(webviewID uint32) bool {
+	r, _, _ := procOpenDevtools.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
-func CloseDevtools(windowID uint32) bool {
-	r, _, _ := procCloseDevtools.Call(uintptr(windowID))
+func CloseDevtools(webviewID uint32) bool {
+	r, _, _ := procCloseDevtools.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
-func IsDevtoolsOpen(windowID uint32) bool {
-	r, _, _ := procIsDevtoolsOpen.Call(uintptr(windowID))
+func IsDevtoolsOpen(webviewID uint32) bool {
+	r, _, _ := procIsDevtoolsOpen.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
-func ClearBrowsingData(windowID uint32) bool {
-	r, _, _ := procClearBrowsingData.Call(uintptr(windowID))
+func ClearBrowsingData(webviewID uint32) bool {
+	r, _, _ := procClearBrowsingData.Call(uintptr(webviewID))
 	return i32(r) == 1
 }
 
@@ -531,4 +550,11 @@ func FlashWindow(windowID uint32, count uint32) bool {
 func ShowAboutDialog(windowID uint32) bool {
 	r, _, _ := procShowAboutDialog.Call(uintptr(windowID))
 	return i32(r) == 1
+}
+
+// CreateBorderlessWindow 创建无边框窗口，返回 Window ID。
+func CreateBorderlessWindow(url string, settings *WebViewSettings) uint32 {
+	opts := DefaultWindowOptions()
+	opts.NoFrame = true
+	return CreateWindow(url, 0, &opts, settings)
 }

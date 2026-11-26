@@ -5,23 +5,25 @@ package jadeview
 //
 //	jadeview.On(jadeview.EventAppReady, handler)
 const (
-	EventAppReady                 = "app-ready"                    // 应用初始化完成（回调里判断 windowID==1 才算成功）
-	EventContextMenu              = "context-menu"                 // 右键菜单（配合 SetContextMenuItems）
-	EventCrash                    = "crash"                        // 程序崩溃（event_data 为 Crash* 错误代码）
-	EventDragDrop                 = "drag-drop"                    // 拖拽事件（enter/over/drop/leave）
-	EventGlobalHotkey             = "global-hotkey"                // 全局热键触发
-	EventJapkLoadFailed           = "japk-load-failed"             // JAPK 资源包加载失败
-	EventJavascriptResult         = "javascript-result"            // ExecuteJavaScript 的执行结果
-	EventMenuItemClicked          = "menu-item-clicked"            // 菜单项点击
-	EventNotificationAction       = "notification-action"          // 通知操作被点击
-	EventNotificationDismissed    = "notification-dismissed"       // 通知已关闭
-	EventNotificationFailed       = "notification-failed"          // 通知显示失败
-	EventNotificationShown        = "notification-shown"           // 通知已显示
-	EventPostMessageReceived      = "postmessage-received"         // 收到前端 postMessage
-	EventSecondInstance           = "second-instance"              // 第二个实例启动（单实例模式）
-	EventThemeChanged             = "theme-changed"                // 系统主题变化
-	EventTrayEvent                = "tray-event"                   // 托盘图标事件
-	EventTrayMenuCommand          = "tray-menu-command"            // 托盘菜单命令
+	EventAppReady = "app-ready" // 应用初始化完成（来源 ID=0，JSON ok:true 表示成功）
+
+	EventCrash            = "crash"              // 程序崩溃（event_data 为 Crash* 错误代码）
+	EventDragDrop         = "drag-drop"          // 拖拽事件（enter/over/drop/leave）
+	EventContextMenuClick = "context-menu-click" // 网页自定义菜单项
+	EventMenuCommand      = "menu-command"       // 菜单项命令
+	EventMenuError        = "menu-error"         // 菜单错误
+	EventGlobalHotkey     = "global-hotkey"      // 全局热键触发
+	EventJapkLoadFailed   = "japk-load-failed"   // JAPK 资源包加载失败
+
+	EventNotificationAction    = "notification-action"    // 通知操作被点击
+	EventNotificationDismissed = "notification-dismissed" // 通知已关闭
+	EventNotificationFailed    = "notification-failed"    // 通知显示失败
+	EventNotificationShown     = "notification-shown"     // 通知已显示
+	EventPostMessageReceived   = "postmessage-received"   // 收到前端 postMessage
+	EventSecondInstance        = "second-instance"        // 第二个实例启动（单实例模式）
+	EventThemeChanged          = "theme-changed"          // 系统主题变化
+	EventTrayEvent             = "tray-event"             // 托盘图标事件
+
 	EventUpdateWindowIcon         = "update-window-icon"           // 更新窗口图标
 	EventWebViewDidFinishLoad     = "webview-did-finish-load"      // WebView 加载完成
 	EventWebViewDidStartLoading   = "webview-did-start-loading"    // WebView 开始加载
@@ -32,13 +34,13 @@ const (
 	EventWindowBlurred            = "window-blurred"               // 窗口失去焦点
 	EventWindowBounds             = "window-bounds"                // 窗口边界变化
 	EventWindowClosed             = "window-closed"                // 窗口关闭
-	EventWindowCreated            = "window-created"               // 窗口创建完成
-	EventWindowDestroyed          = "window-destroyed"             // 窗口销毁
-	EventWindowFocused            = "window-focused"               // 窗口获得焦点
-	EventWindowFullscreen         = "window-fullscreen"            // 窗口全屏状态变化
-	EventWindowMoved              = "window-moved"                 // 窗口移动
-	EventWindowResized            = "window-resized"               // 窗口大小改变
-	EventWindowStateChanged       = "window-state-changed"         // 窗口状态变化（最大化/还原等）
+
+	EventWindowDestroyed    = "window-destroyed"     // 窗口销毁
+	EventWindowFocused      = "window-focused"       // 窗口获得焦点
+	EventWindowFullscreen   = "window-fullscreen"    // 窗口全屏状态变化
+	EventWindowMoved        = "window-moved"         // 窗口移动
+	EventWindowResized      = "window-resized"       // 窗口大小改变
+	EventWindowStateChanged = "window-state-changed" // 窗口状态变化（最大化/还原等）
 )
 
 // 崩溃错误代码（EventCrash 事件的 event_data），对应头文件 JADEVIEW_CRASH_* 宏。

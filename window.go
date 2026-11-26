@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && amd64 && jadeview_cgo && cgo
 
 package jadeview
 
@@ -47,110 +47,117 @@ func b2i(b bool) C.int32_t {
 	return 0
 }
 
-func (o *WindowOptions) toC(pool *cstrPool) C.WebViewWindowOptions {
-	return C.WebViewWindowOptions{
-		title:              pool.s(o.Title),
-		width:              C.int32_t(o.Width),
-		height:             C.int32_t(o.Height),
-		resizable:          b2i(o.Resizable),
-		frame_style:        pool.s(o.FrameStyle),
-		transparent:        b2i(o.Transparent),
-		background_color:   pool.s(o.BackgroundColor),
-		always_on_top:      b2i(o.AlwaysOnTop),
-		theme:              pool.s(o.Theme),
-		maximized:          b2i(o.Maximized),
-		maximizable:        b2i(o.Maximizable),
-		minimizable:        b2i(o.Minimizable),
-		x:                  C.int32_t(o.X),
-		y:                  C.int32_t(o.Y),
-		min_width:          C.int32_t(o.MinWidth),
-		min_height:         C.int32_t(o.MinHeight),
-		max_width:          C.int32_t(o.MaxWidth),
-		max_height:         C.int32_t(o.MaxHeight),
-		fullscreen:         b2i(o.Fullscreen),
-		focus:              b2i(o.Focus),
-		hide_window:        b2i(o.HideWindow),
-		use_page_icon:      b2i(o.UsePageIcon),
-		content_protection: b2i(o.ContentProtection),
-		auto_save_state:    b2i(o.AutoSaveState),
-		skip_taskbar:       b2i(o.SkipTaskbar),
-		no_activate:        b2i(o.NoActivate),
+func (o *WindowOptions) toC(pool *cstrPool) *C.WebViewWindowOptions {
+	if o == nil {
+		return nil
 	}
+	c := new(C.WebViewWindowOptions)
+	if err := Preload(); err != nil {
+		panic(err)
+	}
+	if C.window_options_default(c, C.sizeof_WebViewWindowOptions) != 0 {
+		panic("JadeView: WindowOptionsDefault failed")
+	}
+	c.title = pool.s(o.Title)
+	c.width = C.int32_t(o.Width)
+	c.height = C.int32_t(o.Height)
+	c.resizable = b2i(o.Resizable)
+	c.noframe = b2i(o.NoFrame)
+	c.title_bar_style = pool.s(o.TitleBarStyle)
+	c.transparent = b2i(o.Transparent)
+	c.background_color = pool.s(o.BackgroundColor)
+	c.always_on_top = b2i(o.AlwaysOnTop)
+	c.theme = pool.s(o.Theme)
+	c.maximized = b2i(o.Maximized)
+	c.maximizable = b2i(o.Maximizable)
+	c.minimizable = b2i(o.Minimizable)
+	c.x = C.int32_t(o.X)
+	c.y = C.int32_t(o.Y)
+	c.min_width = C.int32_t(o.MinWidth)
+	c.min_height = C.int32_t(o.MinHeight)
+	c.max_width = C.int32_t(o.MaxWidth)
+	c.max_height = C.int32_t(o.MaxHeight)
+	c.fullscreen = b2i(o.Fullscreen)
+	c.focus = b2i(o.Focus)
+	c.hide_window = b2i(o.HideWindow)
+	c.use_page_icon = b2i(o.UsePageIcon)
+	c.skip_taskbar = b2i(o.SkipTaskbar)
+	c.no_activate = b2i(o.NoActivate)
+	c.background_material = pool.s(o.BackgroundMaterial)
+	c.titlebar_back = b2i(!o.HideTitlebarBack)
+	c.titlebar_refresh = b2i(!o.HideTitlebarRefresh)
+	c.titlebar_icon = b2i(!o.HideTitlebarIcon)
+	return c
+}
+func (s *WebViewSettings) toC(pool *cstrPool) *C.WebViewSettings {
+	if s == nil {
+		return nil
+	}
+	c := new(C.WebViewSettings)
+	if err := Preload(); err != nil {
+		panic(err)
+	}
+	if C.webview_settings_default(c, C.sizeof_WebViewSettings) != 0 {
+		panic("JadeView: WebViewSettingsDefault failed")
+	}
+	c.autoplay = b2i(s.Autoplay)
+	c.background_throttling = b2i(s.BackgroundThrottling)
+	c.allow_right_click = b2i(s.AllowRightClick)
+	c.user_agent = pool.s(s.UserAgent)
+	c.preload_js = pool.s(s.PreloadJS)
+	c.allow_fullscreen = b2i(s.AllowFullscreen)
+	c.postmessage_allowed_origins = pool.s(s.PostMessageAllowedOrigins)
+	c.cors_allowed_origins = pool.s(s.CORSAllowedOrigins)
+	c.password_autofill = b2i(s.PasswordAutofill)
+	c.form_autofill = b2i(s.FormAutofill)
+	c.incognito = b2i(s.Incognito)
+	c.disable_clipboard = b2i(s.DisableClipboard)
+	c.proxy_url = pool.s(s.ProxyURL)
+	c.focused = b2i(s.Focused)
+	c.profile_name = pool.s(s.ProfileName)
+	c.devtools = C.int32_t(s.DevTools)
+	c.zoom_factor = C.double(s.ZoomFactor)
+	c.background_color = pool.s(s.BackgroundColor)
+	return c
 }
 
-func (s *WebViewSettings) toC(pool *cstrPool) C.WebViewSettings {
-	return C.WebViewSettings{
-		autoplay:                 b2i(s.Autoplay),
-		background_throttling:    b2i(s.BackgroundThrottling),
-		allow_right_click:        b2i(s.AllowRightClick),
-		ua:                       pool.s(s.UserAgent),
-		preload_js:               pool.s(s.PreloadJS),
-		allow_fullscreen:         b2i(s.AllowFullscreen),
-		postmessage_whitelist:    pool.s(s.PostMessageWhitelist),
-		cors_whitelist:           pool.s(s.CORSWhitelist),
-		autofill:                 b2i(s.Autofill),
-		general_autofill_enabled: b2i(s.GeneralAutofillEnabled),
-		incognito:                b2i(s.Incognito),
-		disable_clipboard:        b2i(s.DisableClipboard),
-		proxy_url:                pool.s(s.ProxyURL),
-		focused:                  b2i(s.Focused),
-	}
-}
-
-// CreateWindow 创建一个 WebView 窗口，返回 window_id（0 表示失败）。
-//
-//   - url      : 初始地址（http(s):// 或自定义协议）
-//   - parentID : 父窗口 ID，0 表示无父窗口
-//   - opts     : 窗口选项，nil 则用 DefaultWindowOptions()
-//   - settings : WebView 高级设置，nil 则全用默认
+// CreateWindow 创建 Window 和默认 WebView，返回 Window ID。nil 配置使用原生默认值。
 func CreateWindow(url string, parentID uint32, opts *WindowOptions, settings *WebViewSettings) uint32 {
 	pool := &cstrPool{}
 	defer pool.free()
-
-	if opts == nil {
-		d := DefaultWindowOptions()
-		opts = &d
+	if err := Preload(); err != nil {
+		return 0
 	}
-	if settings == nil {
-		settings = &WebViewSettings{}
-	}
-	copts := opts.toC(pool)
-	csettings := settings.toC(pool)
-
-	id := C.create_webview_window(pool.s(url), C.uint32_t(parentID), &copts, &csettings)
-	return uint32(id)
+	return uint32(C.create_webview_window(pool.s(url), C.uint32_t(parentID), opts.toC(pool), settings.toC(pool), opts.features()))
 }
 
-// CreateBorderlessWindow 创建独立无边框 WebView 窗口，返回 window_id。
-// 仅此类窗口可通过 GetWindowHWND 取原生句柄。
-func CreateBorderlessWindow(url string, settings *WebViewSettings) uint32 {
+// CreateEmptyWindow 创建不带 WebView 的原生 Window。
+func CreateEmptyWindow(parentID uint32, opts *WindowOptions) uint32 {
 	pool := &cstrPool{}
 	defer pool.free()
-	if settings == nil {
-		settings = &WebViewSettings{}
+	if err := Preload(); err != nil {
+		return 0
 	}
-	csettings := settings.toC(pool)
-	id := C.create_borderless_webview_window(pool.s(url), &csettings)
-	return uint32(id)
+	return uint32(C.create_window(C.uint32_t(parentID), opts.toC(pool), opts.features()))
+}
+
+func (o *WindowOptions) features() *C.JadeWindowFeatures {
+	if o == nil || (!o.ContentProtection && !o.AutoSaveState) {
+		return nil
+	}
+	return &C.JadeWindowFeatures{struct_size: C.sizeof_JadeWindowFeatures, abi_version: C.uint32_t(ABIVersion), content_protection: b2i(o.ContentProtection), auto_save_state: b2i(o.AutoSaveState)}
 }
 
 // --- 常用窗口操作（薄封装） ---
 
-func Navigate(windowID uint32, url, headersJSON string) bool {
+func Navigate(webviewID uint32, url, headersJSON string) bool {
 	pool := &cstrPool{}
 	defer pool.free()
-	return C.navigate_to_url(C.uint32_t(windowID), pool.s(url), pool.s(headersJSON)) == 1
+	return C.navigate_to_url(C.uint32_t(webviewID), pool.s(url), pool.s(headersJSON)) == 1
 }
 
-func Reload(windowID uint32) bool {
-	return C.reload_webview_window(C.uint32_t(windowID)) == 1
-}
-
-// ExecuteJavaScript 执行 JS，返回一个唯一 id；结果通过 "javascript-result" 事件异步返回。
-func ExecuteJavaScript(windowID uint32, script string) int32 {
-	pool := &cstrPool{}
-	defer pool.free()
-	return int32(C.execute_javascript(C.uint32_t(windowID), pool.s(script)))
+func Reload(webviewID uint32) bool {
+	return C.reload_webview_window(C.uint32_t(webviewID)) == 1
 }
 
 func SetTitle(windowID uint32, title string) bool {
@@ -198,4 +205,11 @@ func IsMaximized(windowID uint32) bool {
 // WindowCount 返回当前窗口数量。
 func WindowCount() uint32 {
 	return uint32(C.get_window_count())
+}
+
+// CreateBorderlessWindow 创建无边框窗口，返回 Window ID。
+func CreateBorderlessWindow(url string, settings *WebViewSettings) uint32 {
+	opts := DefaultWindowOptions()
+	opts.NoFrame = true
+	return CreateWindow(url, 0, &opts, settings)
 }

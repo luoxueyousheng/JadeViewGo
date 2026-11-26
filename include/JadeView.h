@@ -13,11 +13,19 @@
  */
 typedef struct WebViewSettings {
   /**
+   * Allocated structure size in bytes; initialize with the sized default function.
+   */
+  uint32_t struct_size;
+  /**
+   * JADE_ABI_VERSION; checked before reading any configuration fields.
+   */
+  uint32_t abi_version;
+  /**
    * 是否允许自动播放媒体 (0=false, 1=true)
    */
   int32_t autoplay;
   /**
-   * 背景限速策略 (0=默认, 1=禁用背景限速)
+   * 后台定时器：0/2=引擎默认，1=禁用后台定时器节流；Windows 使用启动参数，Linux 不支持非零设置
    */
   int32_t background_throttling;
   /**
@@ -27,7 +35,7 @@ typedef struct WebViewSettings {
   /**
    * 自定义User-Agent字符串指针，NULL表示使用默认UA
    */
-  const char *ua;
+  const char *user_agent;
   /**
    * 预载JavaScript代码字符串指针，NULL表示不预载JS
    */
@@ -37,21 +45,21 @@ typedef struct WebViewSettings {
    */
   int32_t allow_fullscreen;
   /**
-   * PostMessage白名单，单个域名字符串
+   * PostMessage 允许来源，逗号或分号分隔；* 允许所有来源
    */
-  const char *postmessage_whitelist;
+  const char *postmessage_allowed_origins;
   /**
-   * CORS来源白名单，逗号分隔多个域名
+   * CORS 允许来源，逗号或分号分隔；* 允许所有来源
    */
-  const char *cors_whitelist;
+  const char *cors_allowed_origins;
   /**
    * 是否启用账号/密码自动填充 (0=禁用, 1=启用)
    */
-  int32_t autofill;
+  int32_t password_autofill;
   /**
    * 是否启用通用表单自动填充 (0=禁用, 1=启用)
    */
-  int32_t general_autofill_enabled;
+  int32_t form_autofill;
   /**
    * 无痕模式 (0=否, 1=是)
    */
@@ -69,17 +77,36 @@ typedef struct WebViewSettings {
    */
   int32_t focused;
   /**
-   * Windows 专属：WebView2 Profile 名称（NULL/空字符串表示默认 Profile）
+   * Profile 名称；Linux 命名 Profile 独占视图并保持固定 HTTPS 来源，未命名使用临时隔离。
    */
   const char *profile_name;
+  /**
+   * 开发者工具：0=跟随全局 devmod，1=启用，2=禁用。
+   */
+  int32_t devtools;
+  /**
+   * 页面初始缩放倍数；0 采用默认 1.0。
+   */
+  double zoom_factor;
+  /**
+   * WebView 背景色 #RRGGBB 或 #RRGGBBAA；NULL 继承窗口背景。
+   */
+  const char *background_color;
 } WebViewSettings;
 
 /**
  * WebView窗口选项结构体，C-compatible
- * 字段顺序必须与create_webview_window函数中的解构赋值顺序完全匹配
- * 字段数量和类型必须与易语言的JadeView窗口设置结构体完全匹配
+ * 宿主绑定必须与当前头文件的完整字段布局一致。
  */
 typedef struct WebViewWindowOptions {
+  /**
+   * Allocated structure size in bytes; initialize with the sized default function.
+   */
+  uint32_t struct_size;
+  /**
+   * JADE_ABI_VERSION; checked before reading any configuration fields.
+   */
+  uint32_t abi_version;
   /**
    * 标题
    */
@@ -97,9 +124,13 @@ typedef struct WebViewWindowOptions {
    */
   int32_t resizable;
   /**
-   * 窗口边框样式：normal / no-titlebar / borderless
+   * 无边框：1=使用现有无边框实现，0=保留系统边框；默认 0。
    */
-  const char *frame_style;
+  int32_t noframe;
+  /**
+   * default=系统标题栏，hidden=隐藏标题栏，BarOverlay=标题栏按钮覆盖层；NULL 等同 default。
+   */
+  const char *title_bar_style;
   /**
    * 透明背景
    */
@@ -169,21 +200,29 @@ typedef struct WebViewWindowOptions {
    */
   int32_t use_page_icon;
   /**
-   * 内容保护
-   */
-  int32_t content_protection;
-  /**
-   * 自动保存窗口状态（0=关闭，1=开启）
-   */
-  int32_t auto_save_state;
-  /**
-   * 不进任务栏/Alt-Tab（0=否，1=是）。追加在末尾以保持结构体字段顺序兼容（易语言/火山 SDK）
+   * 不进任务栏和 Alt-Tab（0=否，1=是）。
    */
   int32_t skip_taskbar;
   /**
-   * 不抢焦点：点击/显示不激活窗口（0=否，1=是）。追加在末尾以保持兼容
+   * 点击或显示时不激活窗口（0=否，1=是）。
    */
   int32_t no_activate;
+  /**
+   * 创建时背景材质：default、mica、micaAlt 或 acrylic；NULL 为默认背景。
+   */
+  const char *background_material;
+  /**
+   * Windows 默认标题栏与 BarOverlay 共用的返回按钮开关；0=关闭，1=开启，默认 1。
+   */
+  int32_t titlebar_back;
+  /**
+   * Windows 默认标题栏与 BarOverlay 共用的刷新按钮开关；0=关闭，1=开启，默认 1。
+   */
+  int32_t titlebar_refresh;
+  /**
+   * Windows 默认标题栏的窗口图标显示开关；0=隐藏，1=显示，默认 1。
+   */
+  int32_t titlebar_icon;
 } WebViewWindowOptions;
 
 /**
@@ -292,21 +331,235 @@ typedef struct MessageBoxParams {
   const char *type_;
 } MessageBoxParams;
 
+typedef struct WebViewBounds {
+  const char *x;
+  const char *y;
+  const char *width;
+  const char *height;
+} WebViewBounds;
+
+typedef struct WebViewIdArray {
+  const uint32_t *ids;
+  size_t count;
+} WebViewIdArray;
+
+typedef struct JadeObjectState {
+  uint32_t kind;
+  uint32_t state;
+  uint32_t parent_window_id;
+  uint32_t default_webview_id;
+  int32_t error_code;
+} JadeObjectState;
+
+typedef struct JadeRequestResult {
+  uint32_t state;
+  int32_t error_code;
+  uint32_t object_id;
+  char *message;
+} JadeRequestResult;
+
+typedef struct LogicalRect {
+  double x;
+  double y;
+  double width;
+  double height;
+} LogicalRect;
+
+typedef struct PhysicalRect {
+  int32_t x;
+  int32_t y;
+  uint32_t width;
+  uint32_t height;
+} PhysicalRect;
+
+typedef struct WebViewBoundsResult {
+  struct WebViewBounds bounds;
+  struct LogicalRect logical;
+  struct PhysicalRect physical;
+} WebViewBoundsResult;
+
+typedef struct JapkMountCapabilities {
+  uint32_t backend;
+  int32_t available;
+  int32_t read_only;
+  int32_t caches_plaintext_to_disk;
+  int32_t original_archive_prefix;
+} JapkMountCapabilities;
+
 /**
- * C ABI：与 `JadeView.h` 中 `TrayMenuItemDesc` 一致（用 `parent_key` 指向父项的 `key`，无数组下标）。
- *
- * `item_type`：`0` NORMAL、`1` SUBMENU、`2` DIVIDER、`3` GROUP。
- * `key`：全表唯一，非空 UTF-8（含分隔线也需唯一 key，供内部引用）。
- * `parent_key`：NULL 或空字符串表示根下子项；否则须等于某行的 `key`，且该行须为 SUBMENU 或 GROUP。
+ * register_resource_ex options. mode: 0=controlled (default), 1=native file.
  */
-typedef struct TrayMenuItemDesc {
-  int32_t item_type;
-  const char *key;
+typedef struct ResourceOptions {
+  uint32_t mode;
+} ResourceOptions;
+
+/**
+ * Per-WebView engine/policy capabilities; individual files can still be refused.
+ */
+typedef struct ResourceCapabilities {
+  /**
+   * Bit 1=controlled; bit 2=native currently available for this Ready WebView.
+   */
+  uint32_t supported_modes;
+  uint32_t native_requires_private_view;
+  uint32_t native_requires_permanent;
+  uint32_t native_requires_dedicated_profile;
+  /**
+   * Registrations belonging to this WebView.
+   */
+  uint32_t native_registered;
+  /**
+   * Global retired filesystem backings awaiting browser handle release.
+   */
+  uint32_t native_pending_cleanup;
+} ResourceCapabilities;
+
+/**
+ * Frozen output layout. message is library-owned; release with free_resource_delivery_info.
+ */
+typedef struct ResourceDeliveryInfo {
+  uint32_t mode;
+  uint32_t reason;
+  int32_t native_error_code;
+  char *message;
+} ResourceDeliveryInfo;
+
+typedef struct JadeAbiInfo {
+  uint32_t abi_version;
+  uint32_t pointer_bits;
+  uint32_t window_options_size;
+  uint32_t webview_settings_size;
+} JadeAbiInfo;
+
+typedef struct JapkMountState {
+  int32_t healthy;
+  size_t active_handles;
+} JapkMountState;
+
+typedef struct JadeEvent {
+  uint32_t event_type;
+  uint32_t source_kind;
+  uint64_t source_id;
+  uint32_t window_id;
+  uint32_t webview_id;
+  uint64_t sequence;
+  uint64_t request_id;
+  uint32_t flags;
+  uint32_t state;
+  int32_t error_code;
+  const char *name;
+  const uint8_t *data;
+  size_t data_size;
+} JadeEvent;
+
+typedef struct JadeMenuIconDesc {
+  /**
+   * PNG/ICO path, or TTF/OTF/TTC/OTC path with a nonzero `icon_codepoint`.
+   * Mounted JAPK paths work for both.
+   */
+  const char *icon_path;
+  /**
+   * PNG/ICO bytes. Copied during the call and used before the image path.
+   */
+  const uint8_t *icon_data;
+  /**
+   * Byte length of `icon_data`; at most 8 MiB.
+   */
+  size_t icon_data_size;
+  /**
+   * Glyph codepoint in the supplied font, or the default icon font if no font path is supplied.
+   * Nonzero takes precedence over image data.
+   * Icon list: https://learn.microsoft.com/zh-cn/windows/apps/design/iconography/segoe-fluent-icons-font
+   */
+  uint32_t icon_codepoint;
+} JadeMenuIconDesc;
+
+typedef struct JadeMenuItemDesc {
+  const char *id;
+  const char *parent_id;
   const char *label;
-  const char *parent_key;
-  int32_t disabled;
-  int32_t dangerous;
-} TrayMenuItemDesc;
+  const char *accelerator;
+  /**
+   * 0 command, 1 submenu, 2 separator, 3 checkbox, 4 radio.
+   */
+  uint32_t kind;
+  /**
+   * 1 disables the item, 2 marks a checkbox or radio item as checked.
+   */
+  uint32_t flags;
+  /**
+   * Optional item icon; zero-initialize for no icon.
+   */
+  struct JadeMenuIconDesc icon;
+} JadeMenuItemDesc;
+
+/**
+ * WebView page context-menu template item. `kind` keeps the same meaning as
+ * `JadeMenuItemDesc`; `role` optionally binds the item to a unified action.
+ */
+typedef struct JadeContextMenuItemDesc {
+  uint32_t struct_size;
+  const char *id;
+  const char *parent_id;
+  const char *label;
+  const char *accelerator;
+  /**
+   * Unified role (e.g. "copy", "paste", "print", "saveImageAs").
+   */
+  const char *role;
+  /**
+   * 0 command, 1 submenu, 2 separator, 3 checkbox, 4 radio.
+   */
+  uint32_t kind;
+  /**
+   * 1 disables the item, 2 marks a checkbox or radio item as checked.
+   */
+  uint32_t flags;
+  struct JadeMenuIconDesc icon;
+} JadeContextMenuItemDesc;
+
+typedef struct JadeMenuPosition {
+  int32_t x;
+  int32_t y;
+} JadeMenuPosition;
+
+typedef struct JadeSplashOptions {
+  uint32_t struct_size;
+  uint32_t abi_version;
+  /**
+   * Bit 0 disables the splash.
+   */
+  uint32_t flags;
+  const char *logo_path;
+  const uint8_t *logo_data;
+  size_t logo_data_size;
+  /**
+   * 0xAARRGGBB.
+   */
+  uint32_t background_color;
+  uint32_t accent_color;
+  uint32_t minimum_ms;
+} JadeSplashOptions;
+
+/**
+ * Optional window features. Zero disables each feature.
+ */
+typedef struct JadeWindowFeatures {
+  uint32_t struct_size;
+  uint32_t abi_version;
+  /**
+   * Enable window content protection.
+   */
+  int32_t content_protection;
+  /**
+   * Save and restore the window position.
+   */
+  int32_t auto_save_state;
+  /**
+   * Optional startup splash for this window.
+   */
+  const struct JadeSplashOptions *splash;
+} JadeWindowFeatures;
 
 
 // -----------------------
@@ -314,8 +567,6 @@ typedef struct TrayMenuItemDesc {
 // -----------------------
 // 应用初始化完成
 #define JADEVIEW_EVENT_APP_READY "app-ready"
-// 右键菜单
-#define JADEVIEW_EVENT_CONTEXT_MENU "context-menu"
 // 程序崩溃
 #define JADEVIEW_EVENT_CRASH "crash"
 // 拖拽事件（enter/over/drop/leave）
@@ -324,10 +575,10 @@ typedef struct TrayMenuItemDesc {
 #define JADEVIEW_EVENT_GLOBAL_HOTKEY "global-hotkey"
 // JAPK 资源包加载失败
 #define JADEVIEW_EVENT_JAPK_LOAD_FAILED "japk-load-failed"
-// JavaScript 执行结果
-#define JADEVIEW_EVENT_JAVASCRIPT_RESULT "javascript-result"
-// 菜单项点击
-#define JADEVIEW_EVENT_MENU_ITEM_CLICKED "menu-item-clicked"
+// 菜单命令
+#define JADEVIEW_EVENT_MENU_COMMAND "menu-command"
+// 菜单显示错误
+#define JADEVIEW_EVENT_MENU_ERROR "menu-error"
 // 通知操作被点击
 #define JADEVIEW_EVENT_NOTIFICATION_ACTION "notification-action"
 // 通知已关闭
@@ -344,8 +595,6 @@ typedef struct TrayMenuItemDesc {
 #define JADEVIEW_EVENT_THEME_CHANGED "theme-changed"
 // 托盘图标事件
 #define JADEVIEW_EVENT_TRAY_EVENT "tray-event"
-// 托盘菜单命令
-#define JADEVIEW_EVENT_TRAY_MENU_COMMAND "tray-menu-command"
 // 更新窗口图标
 #define JADEVIEW_EVENT_UPDATE_WINDOW_ICON "update-window-icon"
 // WebView 加载完成
@@ -364,8 +613,6 @@ typedef struct TrayMenuItemDesc {
 #define JADEVIEW_EVENT_WINDOW_BOUNDS "window-bounds"
 // 窗口关闭
 #define JADEVIEW_EVENT_WINDOW_CLOSED "window-closed"
-// 窗口创建完成
-#define JADEVIEW_EVENT_WINDOW_CREATED "window-created"
 // 窗口销毁
 #define JADEVIEW_EVENT_WINDOW_DESTROYED "window-destroyed"
 // 窗口获得焦点
@@ -423,16 +670,80 @@ typedef struct TrayMenuItemDesc {
 // -----------------------
 
 #ifndef JADEVIEW_CALL
+#ifdef _WIN32
 #define JADEVIEW_CALL __stdcall
+#else
+#define JADEVIEW_CALL
+#endif
 #endif
 
 // 回调函数类型定义
 typedef const char* (JADEVIEW_CALL *IpcCallback)(uint32_t, const char*);
 typedef int32_t (JADEVIEW_CALL *PermissionCallback)(uint32_t, const char*);
+typedef void (JADEVIEW_CALL *JadeEventCallback)(const struct JadeEvent*, void*);
+
+#define JADE_OK 0
+#define JADE_INVALID_ARGUMENT -1
+#define JADE_INVALID_ID -2
+#define JADE_WRONG_OBJECT_TYPE -3
+#define JADE_INVALID_STATE -4
+#define JADE_QUEUE_FULL -5
+#define JADE_NOT_RUNNING -6
+#define JADE_PLATFORM_ERROR -7
+#define JADE_BUSY -8
+#define JADE_INSTANCE_REPLACED -9
+#define JADE_PARENT_DESTROYED -10
+#define JADE_ID_EXHAUSTED -11
+#define JADE_WOULD_DEADLOCK -12
+#define JADE_DOCUMENT_REPLACED -13
+#define JADE_CANCELLED -14
+#define JADE_TIMED_OUT -15
+#define JADE_ABI_VERSION 0x00030003
+#define JADE_SPLASH_DISABLED 1
+#define JADE_RESOURCE_REASON_EXPLICIT_CONTROLLED 0
+#define JADE_RESOURCE_REASON_NATIVE_SELECTED 1
+#define JADE_RESOURCE_REASON_FINITE_TTL 2
+#define JADE_RESOURCE_REASON_GLOBAL 3
+#define JADE_RESOURCE_REASON_PLATFORM 4
+#define JADE_RESOURCE_REASON_NATIVE_REJECTED 5
+#define JADE_RESOURCE_CONTROLLED 0
+#define JADE_RESOURCE_NATIVE 1
+#define JADE_RESOURCE_CAP_CONTROLLED 1
+#define JADE_RESOURCE_CAP_NATIVE 2
+#define JADE_EVENT_ALL 0
+#define JADE_EVENT_CREATED 1
+#define JADE_EVENT_CREATING 2
+#define JADE_EVENT_CREATE_FAILED 3
+#define JADE_EVENT_DESTROYED 4
+#define JADE_EVENT_LOAD_STARTED 5
+#define JADE_EVENT_LOAD_FINISHED 6
+#define JADE_EVENT_CRASHED 7
+#define JADE_EVENT_OPERATION_COMPLETED 8
+#define JADE_EVENT_OPERATION_FAILED 9
+#define JADE_EVENT_OTHER 100
+#define JADE_EVENT_REPLAY 1
+#define JADE_STATE_RESERVED 1
+#define JADE_STATE_CONFIGURED 2
+#define JADE_STATE_CREATING 3
+#define JADE_STATE_READY 4
+#define JADE_STATE_CLOSING 5
+#define JADE_STATE_DESTROYING 6
+#define JADE_STATE_DESTROYED 7
+#define JADE_STATE_FAILED 8
+#define JADE_STATE_CRASHED 9
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// --- from abi.rs ---
+int32_t JADEVIEW_CALL jade_get_abi_info(struct JadeAbiInfo* out, size_t capacity);
+
+// --- from resource_diagnostics.rs ---
+// Query a live registration's original decision; output is untouched on failure.
+// Pass an empty output, and free it before reuse. Returns JADE_OK or an error code.
+int32_t JADEVIEW_CALL get_resource_delivery_info(const char* url, uint32_t webview_id, struct ResourceDeliveryInfo* out, size_t capacity);
+void JADEVIEW_CALL free_resource_delivery_info(struct ResourceDeliveryInfo* out);
 
 // --- from japk_api.rs ---
 // 从内存加载 JAPK 文件（仅支持 JAPK v2 签名包）
@@ -466,16 +777,84 @@ char* JADEVIEW_CALL JadeView_get_signature_info(void);
 // - 0=成功
 int32_t JADEVIEW_CALL JadeView_unload(void);
 
+// --- from webview.rs ---
+// Creates a native Window without a WebView. Nonzero means accepted.
+// The optional splash is copied now and used on the first WebView attachment.
+uint32_t JADEVIEW_CALL create_window(uint32_t parent_window_id, const struct WebViewWindowOptions* options, const struct JadeWindowFeatures* features);
+// Create a logical WebView; the native engine is allocated when attached.
+uint32_t JADEVIEW_CALL create_webview(const char* url, const struct WebViewSettings* settings);
+// Create and attach a second (or first) WebView. NULL settings/bounds use defaults.
+uint32_t JADEVIEW_CALL add_webview(uint32_t window_id, const char* url, const struct WebViewSettings* settings, const struct WebViewBounds* bounds);
+uint64_t JADEVIEW_CALL add_webview_to_window(uint32_t window_id, uint32_t webview_id, const struct WebViewBounds* bounds);
+uint64_t JADEVIEW_CALL set_webview_bounds(uint32_t webview_id, const struct WebViewBounds* bounds);
+uint64_t JADEVIEW_CALL navigate_webview(uint32_t webview_id, const char* url);
+uint64_t JADEVIEW_CALL reload_webview(uint32_t webview_id);
+uint64_t JADEVIEW_CALL execute_webview_script(uint32_t webview_id, const char* script);
+uint64_t JADEVIEW_CALL set_webview_visible(uint32_t webview_id, int32_t visible);
+uint64_t JADEVIEW_CALL focus_webview(uint32_t webview_id);
+uint64_t JADEVIEW_CALL destroy_webview(uint32_t webview_id);
+uint64_t JADEVIEW_CALL recreate_webview(uint32_t webview_id, const char* url, const struct WebViewSettings* settings);
+uint32_t JADEVIEW_CALL get_default_webview(uint32_t window_id);
+int32_t JADEVIEW_CALL set_default_webview(uint32_t window_id, uint32_t webview_id);
+int32_t JADEVIEW_CALL get_window_webviews(uint32_t window_id, struct WebViewIdArray* out_array);
+void JADEVIEW_CALL free_webview_id_array(struct WebViewIdArray* array);
+uint32_t JADEVIEW_CALL get_webview_parent_window_id(uint32_t webview_id);
+int32_t JADEVIEW_CALL get_webview_state(uint32_t webview_id, struct JadeObjectState* out);
+int32_t JADEVIEW_CALL get_window_state(uint32_t window_id, struct JadeObjectState* out);
+// Result state: 1 accepted, 2 waiting, 3 succeeded, 4 failed, 5 cancelled.
+// Initialize out->message to NULL. Free with free_request_result, then release_request.
+int32_t JADEVIEW_CALL get_request_result(uint64_t request_id, struct JadeRequestResult* out);
+void JADEVIEW_CALL free_request_result(struct JadeRequestResult* result);
+int32_t JADEVIEW_CALL release_request(uint64_t request_id);
+int32_t JADEVIEW_CALL jade_last_error_code(void);
+// Copy the thread-local message. Release the returned string with jade_text_free.
+char* JADEVIEW_CALL jade_last_error_message(void);
+// Write defaults only within capacity. Returns JADE_OK or INVALID_ARGUMENT.
+int32_t JADEVIEW_CALL window_options_default(struct WebViewWindowOptions* out, size_t capacity);
+// Write defaults only within capacity. Returns JADE_OK or INVALID_ARGUMENT.
+int32_t JADEVIEW_CALL webview_settings_default(struct WebViewSettings* out, size_t capacity);
+// Applied bounds snapshot. Initialize all string pointers to NULL; release with
+// free_webview_bounds_result before reuse. Does not wait for the UI thread.
+int32_t JADEVIEW_CALL get_webview_bounds(uint32_t webview_id, struct WebViewBoundsResult* out);
+void JADEVIEW_CALL free_webview_bounds_result(struct WebViewBoundsResult* out);
+
+// --- from host_fs.rs ---
+// Verify/decrypt a JAPK once, then retain its shared immutable index. 0 is failure.
+uint64_t JADEVIEW_CALL register_japk(const char* archive_path);
+// Retire a package. Existing native file handles and WebView resource references
+// remain valid; mounted filesystems stop accepting new opens. Unmount separately.
+int32_t JADEVIEW_CALL unregister_japk(uint64_t archive_id);
+// NULL mount_root uses the archive's path without .japk (app.japk -> app/).
+// Does not install drivers, enable components, extract files or intercept APIs.
+uint64_t JADEVIEW_CALL mount_japk(uint64_t archive_id, const char* mount_root);
+// BUSY leaves the provider and existing handles alive; new opens are denied.
+// Release files, directory iterators and mappings, then retry.
+int32_t JADEVIEW_CALL unmount_japk(uint64_t mount_id);
+// Library-allocated UTF-8 string; release with jade_text_free.
+char* JADEVIEW_CALL get_japk_mount_root(uint64_t mount_id);
+int32_t JADEVIEW_CALL get_japk_mount_capabilities(struct JapkMountCapabilities* out);
+int32_t JADEVIEW_CALL get_japk_mount_state(uint64_t mount_id, struct JapkMountState* out);
+// Register the already-verified default in-memory package without decrypting it again.
+// Memory packages require an explicit mount_root in mount_japk.
+uint64_t JADEVIEW_CALL register_loaded_japk(void);
+
+// --- from events.rs ---
+uint64_t JADEVIEW_CALL on_app_event(uint32_t event_type, JadeEventCallback callback, void* user_data);
+uint64_t JADEVIEW_CALL on_window_event(uint32_t window_id, uint32_t event_type, JadeEventCallback callback, void* user_data);
+uint64_t JADEVIEW_CALL on_webview_event(uint32_t webview_id, uint32_t event_type, JadeEventCallback callback, void* user_data);
+uint64_t JADEVIEW_CALL unsubscribe_event(uint64_t subscription_id);
+// Deep-copy a callback-scoped event. Free the result with event_free.
+struct JadeEvent* JADEVIEW_CALL event_clone(const struct JadeEvent* event);
+void JADEVIEW_CALL event_free(struct JadeEvent* event);
+
 // --- from lifecycle.rs ---
 // DLL初始化
 // 备注 · app_signature 长度限制：
 // `app_signature` 必填，且 **trim 后至少 `MIN_APP_SIGNATURE_CHARS`（=6）个 Unicode 字符**；
 // `app_name` 必填、非纯空白。过短/缺失会被拒绝（例如 `"jvh"` 仅 3 字符 → 拒绝）。
 // 返回值：成功返回 `1`；失败返回 `0`（参数校验未过，或启用单实例时本进程为第二实例）。
-// 失败时**不启动 GUI 线程**，但仍通过 `app-ready` 事件回报宿主：
-// `window_id == 1` 成功、`window_id == 0` 失败（event_data 为错误描述）。
-// ⚠️ 宿主在 `jade_on("app-ready", ...)` 里必须判断 `window_id`，不要无条件继续建窗——
-// 否则签名过短时会在未初始化状态下误建窗、协议名回退为默认。
+// 参数校验失败时不启动 GUI 线程，`app-ready` 正文包含错误描述。
+// 宿主必须检查初始化返回值及 app-ready 正文，不能仅收到同名通知就继续建窗。
 int32_t JADEVIEW_CALL JadeView_init(int32_t enable_devmod, const char* log_path, const char* data_directory, const char* app_name, const char* app_signature, int32_t single_instance);
 // 运行消息循环
 int32_t JADEVIEW_CALL run_message_loop(void);
@@ -485,115 +864,172 @@ int32_t JADEVIEW_CALL jadeview_exit(void);
 int32_t JADEVIEW_CALL jadeview_exit_wait(uint32_t timeout_ms);
 
 // --- from window.rs ---
-// 创建WebView窗口
-uint32_t JADEVIEW_CALL create_webview_window(const char* url, uint32_t parent_window_id, const struct WebViewWindowOptions* options, const struct WebViewSettings* webview_settings);
-// 独立无边框 WebView 窗口：内部为普通承载窗口 + WebView，返回 `window_id`。
-// 仅此类窗口可通过 `get_window_hwnd` 获取原生句柄。
-uint32_t JADEVIEW_CALL create_borderless_webview_window(const char* url, const struct WebViewSettings* webview_settings);
-// 获取创建的窗口句柄 HWND；标准窗口始终返回 0。
+// Creates a Window and its default WebView. Returns a Window ID.
+// Optional features, including the splash and logo, are copied during the call.
+uint32_t JADEVIEW_CALL create_webview_window(const char* url, uint32_t parent_window_id, const struct WebViewWindowOptions* options, const struct WebViewSettings* webview_settings, const struct JadeWindowFeatures* features);
+// 获取 Windows 窗口的 HWND。窗口尚未就绪或平台不提供 HWND 时返回 0。
+// window_id is a Window ID, not a WebView ID.
 size_t JADEVIEW_CALL get_window_hwnd(uint32_t window_id);
 // 根据 HWND 获取窗口 ID
-uint32_t JADEVIEW_CALL get_window_id(int32_t hwnd);
+uint32_t JADEVIEW_CALL get_window_id(size_t hwnd);
 // 导航到URL
-int32_t JADEVIEW_CALL navigate_to_url(uint32_t window_id, const char* url, const char* headers_json);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL navigate_to_url(uint32_t webview_id, const char* url, const char* headers_json);
 // 刷新webview页面
-int32_t JADEVIEW_CALL reload_webview_window(uint32_t window_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL reload_webview_window(uint32_t webview_id);
 // 原生后退
-int32_t JADEVIEW_CALL webview_go_back(uint32_t window_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL webview_go_back(uint32_t webview_id);
 // 原生前进
-int32_t JADEVIEW_CALL webview_go_forward(uint32_t window_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL webview_go_forward(uint32_t webview_id);
 // 查询是否可后退
-int32_t JADEVIEW_CALL webview_can_go_back(uint32_t window_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL webview_can_go_back(uint32_t webview_id);
 // 查询是否可前进
-int32_t JADEVIEW_CALL webview_can_go_forward(uint32_t window_id);
-// 执行JavaScript，返回唯一id，通过javascript-result事件返回结果
-int32_t JADEVIEW_CALL execute_javascript(uint32_t window_id, const char* script);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL webview_can_go_forward(uint32_t webview_id);
 // 设置窗口标题
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_title(uint32_t window_id, const char* title);
 // 设置窗口大小
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_size(uint32_t window_id, int32_t width, int32_t height);
 // 设置窗口位置
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_position(uint32_t window_id, int32_t x, int32_t y);
 // 设置窗口可见性
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_visible(uint32_t window_id, int32_t visible);
 // 设置窗口焦点
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_focus(uint32_t window_id);
 // 设置窗口是否置顶
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_always_on_top(uint32_t window_id, int32_t always_on_top);
 // 不进任务栏/Alt-Tab（跨平台：Windows WS_EX_TOOLWINDOW、Linux GTK skip-taskbar-hint）
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_skip_taskbar(uint32_t window_id, int32_t skip);
 // 不抢焦点：点击/显示不激活窗口（Windows WS_EX_NOACTIVATE、Linux gtk accept-focus=false）
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_no_activate(uint32_t window_id, int32_t no_activate);
 // 设置窗口层级：topmost | normal | bottom | desktop
 // topmost/normal/bottom 跨平台（tao set_always_on_top/bottom）；
 // desktop=贴桌面壁纸层（Windows 寄生 WorkerW、Linux GTK desktop type hint）。
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_level(uint32_t window_id, const char* level);
 // 关闭窗口
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL close_window(uint32_t window_id);
 // 最小化窗口
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL minimize_window(uint32_t window_id);
 // 切换窗口最大化/还原状态
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL toggle_maximize_window(uint32_t window_id);
 // 获取窗口是否最大化
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL is_window_maximized(uint32_t window_id);
 // 设置内容保护
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_content_protection(uint32_t window_id, int32_t content_protection);
 // 设置WebView缩放级别
-int32_t JADEVIEW_CALL set_webview_zoom(uint32_t window_id, double level);
-// 设置窗口边框样式
-int32_t JADEVIEW_CALL set_window_frame_style(uint32_t window_id, const char* frame_style);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL set_webview_zoom(uint32_t webview_id, double level);
+// 修改标题栏样式，窗口边框保持创建时的配置。
+int32_t JADEVIEW_CALL set_window_frame(uint32_t window_id, const char* title_bar_style);
 // 获取窗口数量
 uint32_t JADEVIEW_CALL get_window_count(void);
 // 注册事件处理器
+// Callback argument 1 is the event source ID: App=0, Window=Window ID, WebView=WebView ID. app-ready success is JSON with ok:true, not source ID 1.
 uint32_t JADEVIEW_CALL jade_on(const char* event_name, IpcCallback callback);
 // 注销事件处理器
+// 返回时只保证回调不再接收后续事件，不等待已经开始执行的回调；注销后要立即释放上下文时使用 jade_off_wait。
 int32_t JADEVIEW_CALL jade_off(const char* event_name, uint32_t callback_id);
+// Unregisters a named-event callback and returns a request that completes only
+// after every invocation that already started has returned. Wait for the
+// request before freeing the callback context. Unknown or inactive callback
+// IDs complete the request with JADE_INVALID_ID; an invalid event name uses
+// JADE_INVALID_ARGUMENT; 0 means no request could be created.
+// `jade_off` remains the immediate-return variant and does not wait.
+uint64_t JADEVIEW_CALL jade_off_wait(const char* event_name, uint32_t callback_id);
 // 订阅前端发送的IPC消息
+// Invoke callback argument 1 is the originating WebView ID, not its parent Window ID.
 int32_t JADEVIEW_CALL register_ipc_handler(const char* channel, IpcCallback ipc_cb);
 // 设置窗口主题
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_theme(uint32_t window_id, const char* theme);
-// 设置标题栏覆盖层样式（Windows only）
-// 参数:
-// window_id: 目标窗口ID
-// height: 覆盖层高度（<=0 不修改）
-// icon_color_hex: 图标颜色十六进制（如 #FFFFFF）
-// hover_bg_hex: 悬浮背景色十六进制（不含关闭按钮）
-// 返回: 1 成功，0 失败
-int32_t JADEVIEW_CALL set_titlebar_overlay_style(uint32_t window_id, int32_t height, const char* icon_color_hex, const char* hover_bg_hex);
+// Windows: configure navigation buttons, caption icon visibility and minimize/maximize capability.
+// Icon visibility applies to the default caption and never changes the taskbar icon.
+// Back appears only when history exists. Refresh is disabled and spins while loading.
+// Returns 1 when queued, 0 on rejection. Every flag must be 0 or 1.
+int32_t JADEVIEW_CALL set_titlebar_components(uint32_t window_id, int32_t back, int32_t refresh, int32_t icon, int32_t minimize, int32_t maximize);
+// Windows: style default and BarOverlay captions. Window ID, not WebView ID.
+// height: -1 keeps the current height, 0 resets to the mode default, 20..=100 sets DIP.
+// NULL and empty colors reset to the current theme's default.
+// background_color applies to the default caption. foreground_color sets the
+// title text and normal button glyph color in both caption modes where drawn.
+int32_t JADEVIEW_CALL set_titlebar_style(uint32_t window_id, int32_t height, const char* background_color, const char* foreground_color, const char* button_background_color, const char* button_hover_background_color, const char* button_hover_foreground_color);
 // 启用/禁用窗口
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_enabled(uint32_t window_id, int32_t enabled);
 // 获取窗口主题
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL get_window_theme(uint32_t window_id);
 // 请求窗口重绘
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL request_redraw(uint32_t window_id);
 // 发送IPC消息
-int32_t JADEVIEW_CALL send_ipc_message(uint32_t window_id, const char* message_type, const char* message_content);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+// Returns 1 when queued, 0 on failure; inspect jade_last_error_code/message on this thread.
+int32_t JADEVIEW_CALL send_ipc_message(uint32_t webview_id, const char* message_type, const char* message_content);
 // 设置窗口背景材料
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_backdrop(uint32_t window_id, const char* backdrop_type);
 // 设置窗口背景色（纯色底）：#RRGGBBAA
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_background_color(uint32_t window_id, const char* background_color_hex);
 // 设置窗口全屏
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_fullscreen(uint32_t window_id, int32_t fullscreen);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL get_window_bounds(uint32_t window_id, char* buffer, int32_t buffer_size);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL is_window_minimized(uint32_t window_id);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL is_window_visible(uint32_t window_id);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL is_window_focused(uint32_t window_id);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL is_window_fullscreen(uint32_t window_id);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_min_size(uint32_t window_id, int32_t width, int32_t height);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_max_size(uint32_t window_id, int32_t width, int32_t height);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_resizable(uint32_t window_id, int32_t resizable);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_ignore_cursor_events(uint32_t window_id, int32_t ignore);
-int32_t JADEVIEW_CALL get_webview_url(uint32_t window_id, char* buffer, int32_t buffer_size);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL get_webview_url(uint32_t webview_id, char* buffer, int32_t buffer_size);
 // 设置统一网页权限处理器
 int32_t JADEVIEW_CALL set_webview_permission_handler(PermissionCallback callback);
 // 清除统一网页权限处理器
 int32_t JADEVIEW_CALL clear_webview_permission_handler(void);
-int32_t JADEVIEW_CALL open_devtools(uint32_t window_id);
-int32_t JADEVIEW_CALL close_devtools(uint32_t window_id);
-int32_t JADEVIEW_CALL is_devtools_open(uint32_t window_id);
-int32_t JADEVIEW_CALL clear_browsing_data(uint32_t window_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL open_devtools(uint32_t webview_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL close_devtools(uint32_t webview_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL is_devtools_open(uint32_t webview_id);
+// webview_id is a WebView ID; use get_default_webview(window_id) after creating a window.
+int32_t JADEVIEW_CALL clear_browsing_data(uint32_t webview_id);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL set_window_progress(uint32_t window_id, int32_t progress, int32_t state);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL flash_window(uint32_t window_id, uint32_t count);
+// window_id is a Window ID, not a WebView ID.
 int32_t JADEVIEW_CALL show_about_dialog(uint32_t window_id);
 
 // --- from tray.rs ---
@@ -602,9 +1038,26 @@ int32_t JADEVIEW_CALL tray_destroy(uint32_t tray_id);
 int32_t JADEVIEW_CALL tray_set_visible(uint32_t tray_id, int32_t visible);
 int32_t JADEVIEW_CALL tray_set_tooltip(uint32_t tray_id, const char* tooltip_utf8);
 int32_t JADEVIEW_CALL tray_set_icon_from_file(uint32_t tray_id, const char* icon_path_utf8);
-// 用扁平表设置托盘根菜单（库内深拷贝字符串）。`item_count==0` 表示清除菜单。成功 `1`，失败 `0`。
-int32_t JADEVIEW_CALL tray_set_menu_items(uint32_t tray_id, const struct TrayMenuItemDesc* items, uint32_t item_count);
 int32_t JADEVIEW_CALL set_tray_icon_from_data(uint32_t tray_id, const uint8_t* icon_data, uint32_t data_len);
+
+// --- from menu.rs ---
+// Shows an independent popup. Window ID 0 uses the screen as its coordinate space.
+// Position is in client logical pixels for a window, or desktop coordinates without one.
+// NULL position uses the cursor. Entries and position are copied before return.
+// Item icons are part of JadeMenuItemDesc.
+// Returns 1 when queued. A selection emits menu-command with item_id.
+int32_t JADEVIEW_CALL jade_menu_popup(uint32_t window_id, const struct JadeMenuItemDesc* items, uint32_t item_count, const struct JadeMenuPosition* position);
+// Replaces the application menu, or hides it with a zero item count.
+int32_t JADEVIEW_CALL jade_set_application_menu(const struct JadeMenuItemDesc* items, uint32_t item_count);
+// Replaces the menu for a Window, or hides it with a zero item count.
+int32_t JADEVIEW_CALL jade_window_set_menu(uint32_t window_id, const struct JadeMenuItemDesc* items, uint32_t item_count);
+// Sets the page context-menu template for one WebView. The rows and strings
+// are copied during the call. Items without a role are custom items and
+// report `context-menu-click`; role items use unified action names.
+// Pass count=0 to clear.
+int32_t JADEVIEW_CALL jade_webview_set_context_menu(uint32_t webview_id, const struct JadeContextMenuItemDesc* items, uint32_t item_count);
+// Removes the page context-menu template for one WebView.
+int32_t JADEVIEW_CALL jade_webview_clear_context_menu(uint32_t webview_id);
 
 // --- from dialog.rs ---
 // 显示通知
@@ -642,20 +1095,6 @@ int32_t JADEVIEW_CALL jade_dialog_show_error_box(uint32_t window_id, const char*
 int32_t JADEVIEW_CALL jade_dialog_show_open_dialog_async(const struct FileDialogParams* params, void (*callback)(const char*));
 int32_t JADEVIEW_CALL jade_dialog_show_save_dialog_async(const struct FileDialogParams* params, void (*callback)(const char*));
 int32_t JADEVIEW_CALL jade_dialog_show_message_box_async(const struct MessageBoxParams* params, void (*callback)(const char*));
-// 创建菜单项，返回 menu_id（0=失败）
-// label: 显示文本, kind: 0=普通命令, 1=分隔线, 2=复选框, 3=单选, 4=子菜单
-// parent_menu_id: 0=顶级菜单, >0=添加到指定子菜单
-// item_id: 用户自定义ID，点击时通过 menu-item-clicked 事件返回
-uint32_t JADEVIEW_CALL jade_menu_item_create(const char* label, int32_t kind, uint32_t parent_menu_id, int32_t item_id);
-// 设置菜单项启用/禁用
-int32_t JADEVIEW_CALL jade_menu_item_set_enabled(uint32_t menu_id, int32_t enabled);
-// 设置复选框/单选的选中状态
-int32_t JADEVIEW_CALL jade_menu_item_set_checked(uint32_t menu_id, int32_t checked);
-// 设置当前右键菜单要显示的菜单项（在 context-menu 事件回调中调用）
-// 传入顶级菜单项 ID 数组，按顺序显示
-int32_t JADEVIEW_CALL jade_set_context_menu_items(uint32_t window_id, const uint32_t* menu_ids, int32_t count);
-// 销毁菜单项（及其子项）
-int32_t JADEVIEW_CALL jade_menu_item_destroy(uint32_t menu_id);
 
 // --- from yaml_store.rs ---
 // YAML: set value by key path (a.b.c). `value` 可为 JSON、YAML 片段或任意纯文本（见 parse_yaml_set_payload）。
@@ -719,7 +1158,8 @@ int32_t JADEVIEW_CALL jade_get_printer_list(char* buffer, int32_t buffer_size);
 // # 返回值
 // - `>0`: 成功，写入输出缓冲区的字节数（不含 NUL）
 // - `0`: 失败（参数无效、编码检测失败、目标编码不支持等）
-// - `<0`: 缓冲区不足，绝对值为所需缓冲区大小
+// - `<0`: 缓冲区不足，绝对值为所需缓冲区大小（含 NUL），不写入正文
+// - 输出长度（含 NUL）无法用 i32 表示时返回 0
 // # 检测逻辑
 // 1. BOM 优先（UTF-8 BOM / UTF-16 LE BOM / UTF-16 BE BOM）
 // 2. 无 BOM 时使用 chardetng 智能检测
@@ -728,6 +1168,21 @@ int32_t JADEVIEW_CALL smart_convert_encoding(const uint8_t* input_data, int32_t 
 // 设置自定义协议服务路径（原 create_local_server）
 // hot_reload: 是否启用热载模式 (0=禁用, 1=启用)，仅文件系统模式有效
 int32_t JADEVIEW_CALL set_protocol_service_path(const char* root_path, char* url_buffer, size_t buffer_size, int32_t hot_reload);
+// 获取常用系统 / 应用路径，结果写入 `buffer`（UTF-8，NUL 结尾）。
+// `name` 取值：
+// - `home`：用户主目录
+// - `appData`：应用数据目录（Windows=%LOCALAPPDATA%，Linux=~/.config）
+// - `userData`：JadeView 数据目录（`sessionData` / `logs` 的父目录，不存在时自动创建）
+// - `sessionData`：WebView 会话目录（`userData/EBWebView`）
+// - `logs`：日志目录（`userData/logs`，不存在时自动创建）
+// - `temp`：临时目录
+// - `exe`：主进程完整路径
+// - `app`：主进程所在目录
+// - `desktop` / `documents` / `downloads` / `music` / `pictures` / `videos`：标准用户目录
+// # 返回值
+// - `>0`：成功，写入 `buffer` 的字节数（不含 NUL）
+// - `0`：失败（参数无效或该名称无对应路径）
+// - `<0`：缓冲区不足，绝对值为所需字节数
 int32_t JADEVIEW_CALL getPath(const char* name, char* buffer, size_t buffer_size);
 // 显示器信息 JSON 数组写入 `buffer`（UTF-8 NUL 结尾）。每项含 bounds、work_area、scale_factor、dpi_x/y、is_primary。
 // `buffer` 过小则返回 0。
@@ -752,7 +1207,7 @@ int32_t JADEVIEW_CALL set_login_autostart(int32_t enable, const char* args);
 // 查询是否已设置开机自启。返回：1=已设置，0=未设置。
 int32_t JADEVIEW_CALL get_login_autostart(void);
 // 提取任意路径（exe/lnk/普通文件/文件夹）的图标为 PNG，注册为 jade:// 资源，URL 写入 url_buffer。
-// 参数：size 目标边长（16/32/48/64/128/256，<=0 取 48）；window_id 资源归属窗口（0=全局）；
+// 参数：size 目标边长（16/32/48/64/128/256，<=0 取 48）；window_id 资源归属 WebView ID（0=全局）；
 // ttl_seconds 资源过期秒（0=默认，u32::MAX=永不过期）。
 // 返回：1=成功，0=失败。Windows 用 SHGetFileInfo 取系统图标；Linux 用 gio 查询 + gtk IconTheme。
 int32_t JADEVIEW_CALL get_file_icon(const char* path, int32_t size, uint32_t window_id, uint32_t ttl_seconds, char* url_buffer, size_t buffer_size);
@@ -762,22 +1217,49 @@ int32_t JADEVIEW_CALL get_webview_version(char* buffer, size_t buffer_size);
 int32_t JADEVIEW_CALL is_windows_11(void);
 void JADEVIEW_CALL jade_text_free(char* ptr);
 char* JADEVIEW_CALL jade_text_create(const char* text);
-// 注册本地文件为安全资源，返回 jade:// URL
+// 注册本地文件为安全资源，返回可供页面使用的相对 URL 或完整 HTTPS URL。
+// Windows 的永久私有资源会先尝试原生快速模式；条件不满足时使用受控模式。
+// 原生模式可能锁定源文件，HEAD、条件请求和路径替换的行为与受控模式不同。
+// 需要严格受控语义时请使用 register_resource_ex 和 JADE_RESOURCE_CONTROLLED。
 // path: 本地文件绝对路径
-// window_id: 所属窗口ID (0=全局)
-// ttl_seconds: 过期时间秒数 (0=永不过期)
+// window_id: 所属 WebView ID (0=全局)
+// ttl_seconds: 过期时间秒数 (0=默认 6 秒，u32::MAX=永不过期；长媒体应显式指定)
 // url_buffer: 输出URL字符串的缓冲区
 // buffer_size: 缓冲区大小
 // 返回: 1=成功, 0=失败
 int32_t JADEVIEW_CALL register_resource(const char* path, uint32_t window_id, uint32_t ttl_seconds, char* url_buffer, size_t buffer_size);
 // 注销已注册的安全资源
 // token_or_url: token字符串或完整jade://---jade---resource--?token=xxx URL
-// 返回: 1=成功, 0=未找到
+// 返回: 1=成功, 0=失败或未找到。原生模式 BUSY 时先停止页面消费者再重试；
+// 已缓存或已打开的数据无法追回，成功后新的未缓存读取不可再打开该文件。
 int32_t JADEVIEW_CALL unregister_resource(const char* token_or_url);
 // 清理指定窗口的所有已注册资源
-// window_id: 窗口ID
-// 返回: 清理的资源数量
+// window_id: WebView ID
+// 返回: 实际清理数量（含受控和原生资源）。原生项可能因占用部分失败；
+// 检查 jade_last_error_code，BUSY 项仍登记，停止消费者后可再次清理。
 int32_t JADEVIEW_CALL clear_window_resources(uint32_t window_id);
+// Resource mode capabilities for a Ready WebView. Returns JADE_OK or an error.
+// supported_modes bits: JADE_RESOURCE_CAP_CONTROLLED / JADE_RESOURCE_CAP_NATIVE.
+// Native mode needs a private, permanent resource and an exclusive named Profile.
+// Availability covers engine/policy; the file's filesystem must support hard links.
+int32_t JADEVIEW_CALL get_resource_capabilities(uint32_t webview_id, struct ResourceCapabilities* out);
+// Query the actual mode of an active resource. Returns JADE_OK or an error.
+// Use its full returned URL and its owner WebView ID; global resources use 0.
+int32_t JADEVIEW_CALL get_resource_delivery_mode(const char* url, uint32_t webview_id, uint32_t* out_mode);
+// Register a local file with explicit ResourceOptions (NULL = controlled).
+// Controlled mode always uses JadeView's strict resource handler. Native mode:
+// Windows, private Ready WebView, ttl_seconds=UINT32_MAX, exclusive named Profile,
+// unrestricted CORS; a hard link pins the registered file object without copying.
+// Prepared roots cover local temp/data-directory volumes with hard-link support;
+// other volumes fail explicitly. New registrations need no page reload.
+// In-place writers are denied while registered; replacing the source path does
+// not rebind this resource. Native MIME/Range/cache/conditions are engine-owned:
+// HEAD may return a full body and conditional headers may be ignored. Use
+// controlled mode for JadeView's strict HTTP semantics, TTL or global resources.
+// Native output is HTTPS. Release with unregister_resource; BUSY means detach
+// consumers and retry. Cached/already-open browser data cannot be recalled.
+// Returns 1 on success, 0 on failure (jade_last_error_code/message).
+int32_t JADEVIEW_CALL register_resource_ex(const char* path, uint32_t webview_id, uint32_t ttl_seconds, const struct ResourceOptions* options, char* url_buffer, size_t buffer_size);
 int32_t JADEVIEW_CALL clipboard_read_text(char* buffer, int32_t buffer_size);
 int32_t JADEVIEW_CALL clipboard_write_text(const char* text);
 int32_t JADEVIEW_CALL get_cursor_position(char* buffer, int32_t buffer_size);

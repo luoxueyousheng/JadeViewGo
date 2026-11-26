@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && amd64 && jadeview_cgo && cgo
 
 package jadeview
 
@@ -34,20 +34,20 @@ func GetWindowBounds(windowID uint32) (string, bool) {
 }
 
 // GetWebViewURL 返回当前 WebView 地址。
-func GetWebViewURL(windowID uint32) (string, bool) {
+func GetWebViewURL(webviewID uint32) (string, bool) {
 	return bufCallInt(2048, func(buf *C.char, n C.int32_t) C.int32_t {
-		return C.get_webview_url(C.uint32_t(windowID), buf, n)
+		return C.get_webview_url(C.uint32_t(webviewID), buf, n)
 	})
 }
 
-// GetWindowHWND 返回窗口原生句柄（beta.9 起支持所有方法创建的窗口）。
+// GetWindowHWND 返回窗口原生句柄。
 func GetWindowHWND(windowID uint32) uintptr {
 	return uintptr(C.get_window_hwnd(C.uint32_t(windowID)))
 }
 
-// GetWindowID 根据 HWND 反查窗口 ID（beta.9 新增），0 表示未找到。
+// GetWindowID 根据 HWND 反查窗口 ID，0 表示未找到。
 func GetWindowID(hwnd uintptr) uint32 {
-	return uint32(C.get_window_id(C.int32_t(hwnd)))
+	return uint32(C.get_window_id(C.size_t(hwnd)))
 }
 
 // --- 尺寸 / 可调整 ---
@@ -94,14 +94,14 @@ func SetContentProtection(windowID uint32, on bool) bool {
 	return C.set_content_protection(C.uint32_t(windowID), b2i(on)) == 1
 }
 
-func SetZoom(windowID uint32, level float64) bool {
-	return C.set_webview_zoom(C.uint32_t(windowID), C.double(level)) == 1
+func SetZoom(webviewID uint32, level float64) bool {
+	return C.set_webview_zoom(C.uint32_t(webviewID), C.double(level)) == 1
 }
 
-func SetFrameStyle(windowID uint32, frameStyle string) bool {
+func SetWindowFrame(windowID uint32, titleBarStyle string) bool {
 	pool := &cstrPool{}
 	defer pool.free()
-	return C.set_window_frame_style(C.uint32_t(windowID), pool.s(frameStyle)) == 1
+	return C.set_window_frame(C.uint32_t(windowID), pool.s(titleBarStyle)) == 1
 }
 
 func SetTheme(windowID uint32, theme string) bool {
@@ -136,30 +136,37 @@ func RequestRedraw(windowID uint32) bool {
 	return C.request_redraw(C.uint32_t(windowID)) == 1
 }
 
-// SetTitlebarOverlayStyle 设置标题栏覆盖层样式（Windows only）。height<=0 不修改高度。
-func SetTitlebarOverlayStyle(windowID uint32, height int, iconColorHex, hoverBgHex string) bool {
+// SetTitlebarStyle 更新标题栏样式；原生库仅在 Windows 支持此功能。
+func SetTitlebarStyle(windowID uint32, style TitlebarStyleOptions) bool {
 	pool := &cstrPool{}
 	defer pool.free()
-	return C.set_titlebar_overlay_style(C.uint32_t(windowID), C.int32_t(height), pool.s(iconColorHex), pool.s(hoverBgHex)) == 1
+	return C.set_titlebar_style(C.uint32_t(windowID), C.int32_t(style.Height), pool.s(style.BackgroundColor),
+		pool.s(style.ForegroundColor), pool.s(style.ButtonBackgroundColor), pool.s(style.ButtonHoverBackgroundColor),
+		pool.s(style.ButtonHoverForegroundColor)) == 1
+}
+
+// SetTitlebarComponents 一次更新五个标题栏开关；原生库仅在 Windows 支持。
+func SetTitlebarComponents(windowID uint32, back, refresh, icon, minimize, maximize bool) bool {
+	return C.set_titlebar_components(C.uint32_t(windowID), b2i(back), b2i(refresh), b2i(icon), b2i(minimize), b2i(maximize)) == 1
 }
 
 // --- IPC / DevTools / 其它 ---
 
 // SendIPCMessage 向前端发送 IPC 消息。
-func SendIPCMessage(windowID uint32, messageType, messageContent string) bool {
+func SendIPCMessage(webviewID uint32, messageType, messageContent string) bool {
 	pool := &cstrPool{}
 	defer pool.free()
-	return C.send_ipc_message(C.uint32_t(windowID), pool.s(messageType), pool.s(messageContent)) == 1
+	return C.send_ipc_message(C.uint32_t(webviewID), pool.s(messageType), pool.s(messageContent)) == 1
 }
 
-func OpenDevtools(windowID uint32) bool  { return C.open_devtools(C.uint32_t(windowID)) == 1 }
-func CloseDevtools(windowID uint32) bool { return C.close_devtools(C.uint32_t(windowID)) == 1 }
-func IsDevtoolsOpen(windowID uint32) bool {
-	return C.is_devtools_open(C.uint32_t(windowID)) == 1
+func OpenDevtools(webviewID uint32) bool  { return C.open_devtools(C.uint32_t(webviewID)) == 1 }
+func CloseDevtools(webviewID uint32) bool { return C.close_devtools(C.uint32_t(webviewID)) == 1 }
+func IsDevtoolsOpen(webviewID uint32) bool {
+	return C.is_devtools_open(C.uint32_t(webviewID)) == 1
 }
 
-func ClearBrowsingData(windowID uint32) bool {
-	return C.clear_browsing_data(C.uint32_t(windowID)) == 1
+func ClearBrowsingData(webviewID uint32) bool {
+	return C.clear_browsing_data(C.uint32_t(webviewID)) == 1
 }
 
 // SetWindowProgress 设置任务栏进度。state 含义见库文档。

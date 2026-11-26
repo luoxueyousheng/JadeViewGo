@@ -76,3 +76,5 @@ func callF64I32(p *jvProc, id uint32, f float64) int32 {
 	r, _, _ := syscall.SyscallN(stub, uintptr(id), uintptr(math.Float64bits(f)), p.Addr())
 	return i32(r)
 }
+
+type cWebViewSettings = cWebViewSettingsFields

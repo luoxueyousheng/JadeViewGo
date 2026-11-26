@@ -1,4 +1,4 @@
-//go:build linux || windows
+//go:build windows || (linux && amd64 && (!jadeview_cgo || cgo))
 
 // JadeView Go 封装 · 跨平台可交互示例（Windows / Linux 通用，单一代码库）。
 //
@@ -10,12 +10,12 @@
 // 运行（详见 README「各平台使用方式」）：
 //
 //	Windows: go run ./example            （纯 Go，无需 C 编译器，单 exe 自包含 DLL）
-//	Linux  : go run ./example            （cgo，需 gcc + GTK3/WebKit2GTK，静态链接）
+//	Linux  : go run ./example            （默认纯 Go，运行时需 JadeView 动态库）
 //
 // 关键时序（官方要求）：
 //  1. app-ready 必须在 Init 之前注册；
 //  2. 建窗、协议服务、托盘等都放在 app-ready 回调里；
-//  3. 回调里必须判断 windowID==1 才算初始化成功。
+//  3. app-ready 的来源 ID 为 0，JSON 的 ok:true 表示成功。
 package main
 
 import (
@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	jadeview "github.com/luoxueyousheng/JadeViewGo/v2"
+	jadeview "github.com/luoxueyousheng/JadeViewGo/v3"
 )
 
 // 前端站点（HTML/CSS/JS，含子目录）。加载方式三选一，见 onAppReady 里的 plan：
@@ -58,14 +58,20 @@ var appJAPK []byte
 const titlebarHeight = 40
 
 var (
-	mainWindowID uint32
+	mainWindowID atomic.Uint32
 	trayID       uint32
-	alwaysOnTop  bool
+	alwaysOnTop  atomic.Bool
 	rejectDrops  atomic.Bool // 拖拽页开关：开启后在 drag-drop 的 enter 子事件里同步拒绝拖入
 	dataDir      string      // JadeView 数据目录（库运行时数据，WebView 内核要求必须在磁盘上）
 )
 
 func main() {
+	runtime.LockOSThread()
+	if err := jadeview.Preload(); err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	fmt.Printf("平台: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 
 	// dataDir 是库自身的运行时数据目录（WebView2 用户数据、YAML 存储），无法免除。
@@ -79,10 +85,6 @@ func main() {
 
 	// 1) app-ready 之前注册事件（事件名用库提供的 Event* 常量，避免拼错）
 	jadeview.On(jadeview.EventAppReady, onAppReady)
-	jadeview.On(jadeview.EventWindowCreated, func(id uint32, _ string) string {
-		fmt.Printf("[事件] window-created id=%d\n", id)
-		return ""
-	})
 	jadeview.On(jadeview.EventWindowClosed, func(id uint32, _ string) string {
 		fmt.Printf("[事件] window-closed id=%d\n", id)
 		return ""
@@ -95,22 +97,27 @@ func main() {
 	jadeview.On(jadeview.EventThemeChanged, func(_ uint32, data string) string {
 		fmt.Printf("[事件] 系统主题变化: %s\n", data)
 		// 转发给前端，System 模式下页面据此重算明暗
-		if mainWindowID != 0 {
-			jadeview.SendIPCMessage(mainWindowID, "theme-changed", data)
+		if view := jadeview.DefaultWebView(mainWindowID.Load()); view != 0 {
+			jadeview.SendIPCMessage(view, "theme-changed", data)
 		}
 		return ""
 	})
 	jadeview.On(jadeview.EventWindowStateChanged, func(id uint32, data string) string {
 		// 转发给前端：Linux 自绘窗口据此切换 最大化/还原 图标、去掉圆角阴影贴边显示
-		if mainWindowID != 0 && id == mainWindowID {
-			jadeview.SendIPCMessage(mainWindowID, "window-state-changed", data)
+		if view := jadeview.DefaultWebView(id); id == mainWindowID.Load() && view != 0 {
+			jadeview.SendIPCMessage(view, "window-state-changed", data)
 		}
 		return ""
 	})
 	jadeview.On(jadeview.EventDragDrop, onDragDrop)
-	jadeview.On(jadeview.EventTrayMenuCommand, onTrayMenuCommand)
+	jadeview.On(jadeview.EventMenuCommand, onMenuCommand)
 	jadeview.On(jadeview.EventTrayEvent, func(_ uint32, data string) string {
-		fmt.Printf("[事件] tray-event: %s\n", data)
+		if jsonStr(data, "event") == "right-click" {
+			jadeview.PopupMenu(0, []jadeview.MenuItem{
+				{ID: "show", Label: "显示窗口"}, {ID: "hide", Label: "隐藏窗口"},
+				{ID: "sep1", Kind: jadeview.MenuSeparator}, {ID: "quit", Label: "退出"},
+			}, nil)
+		}
 		return ""
 	})
 	jadeview.On(jadeview.EventCrash, func(_ uint32, data string) string {
@@ -139,8 +146,11 @@ func main() {
 	fmt.Println("消息循环结束")
 }
 
-func onAppReady(windowID uint32, data string) string {
-	if windowID != 1 {
+func onAppReady(_ uint32, data string) string {
+	var result struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.Unmarshal([]byte(data), &result); err != nil || !result.OK {
 		fmt.Println("[app-ready] 初始化失败:", data)
 		jadeview.Exit()
 		return ""
@@ -148,12 +158,12 @@ func onAppReady(windowID uint32, data string) string {
 	fmt.Println("[app-ready] 初始化成功")
 
 	// 前端加载方式（三选一）：
-	//   0 = JAPK 资源包：go:embed 的 app.japk 内存加载（未设公钥=混淆包 JPKBIN02），
+	//   0 = JAPK 资源包：go:embed 的 app.japk 内存加载（请使用与 Init 配置一致、可通过原生验证的签名包），
 	//       再以空路径调 SetProtocolServicePath——协议服务转为内存 JAPK 模式；
 	//   1 = 协议服务挂 example/site 源码目录（hotReload：改页面文件即时刷新，适合开发调试）；
 	//   2 = 进程内 127.0.0.1 HTTP 直出 embed.FS（零落盘，适合分发单 exe）。
 	// 三种方式返回的 URL 都直接用于建窗导航（JAPK 模式形如 JADE://<app_signature>）。
-	plan := 0
+	plan := 2
 	var url string
 	switch plan {
 	case 0:
@@ -197,9 +207,9 @@ func onAppReady(windowID uint32, data string) string {
 	fmt.Println("[app-ready] 站点 URL:", url)
 
 	// 按平台建窗（前端经 PreloadJS 注入的 __JV_ENV 同步做界面适配，见 app.js applyPlatform）：
-	//   Windows 11 : title-overlay（库内置右上角控制按钮）+ 透明窗口 + Mica 材质（Fluent 2 推荐组合）
-	//   Windows 10 : title-overlay 可用，但无 DWM 材质——不开透明，用纯色背景
-	//   Linux      : no-titlebar + 透明窗口，圆角/阴影/控制按钮全部由前端自绘
+	//   Windows 11 : BarOverlay（库内置右上角控制按钮）+ 透明窗口 + Mica 材质（Fluent 2 推荐组合）
+	//   Windows 10 : BarOverlay 可用，但无 DWM 材质——不开透明，用纯色背景
+	//   Linux      : hidden + 透明窗口，圆角/阴影/控制按钮全部由前端自绘
 	//                （title-overlay 也可用，但覆盖层样式上游暂不支持运行时定制、
 	//                深色主题下固定深灰图标不可见，故整体改为自绘方案，随主题换色）
 	win11 := runtime.GOOS == "windows" && jadeview.IsWindows11()
@@ -210,9 +220,9 @@ func onAppReady(windowID uint32, data string) string {
 	opts.MinWidth = 640
 	opts.MinHeight = 480
 	if runtime.GOOS == "windows" {
-		opts.FrameStyle = jadeview.FrameStyle.TitleOverlay // 保留边框 + 无标题栏 + 内置控制按钮（可随主题定制）
+		opts.TitleBarStyle = jadeview.TitleBarStyle.Overlay // 保留边框 + 无标题栏 + 内置控制按钮（可随主题定制）
 	} else {
-		opts.FrameStyle = jadeview.FrameStyle.NoTitlebar // 保留边框 + 无标题栏，控制按钮由前端自绘
+		opts.TitleBarStyle = jadeview.TitleBarStyle.Hidden // 保留边框 + 无标题栏，控制按钮由前端自绘
 	}
 	if win11 {
 		opts.Transparent = true // 配合 Mica 材质
@@ -228,28 +238,28 @@ func onAppReady(windowID uint32, data string) string {
 	// PreloadJS 在页面任何脚本运行前注入：把平台信息挂到 window.__JV_ENV，
 	// 前端启动即可同步读取、无需异步等 "env" IPC（该通道仍保留作兜底）。
 	settings := jadeview.DefaultWebViewSettings()
-	// 跨域兜底：http(s) URL 方式（plan 2）加载时页面与库不同源，IPC 可能被跨域拦截；
-	// 库无接口查询其注册的临时域、CORSWhitelist 无法精确加白，故放开 postMessage 白名单。
-	// jade:// 同源方案（plan 0/1）不受此影响。
-	settings.PostMessageWhitelist = "*"
+	if plan == 2 {
+		settings.PostMessageAllowedOrigins = strings.TrimSuffix(url, "/index.html")
+	}
 	settings.PreloadJS = fmt.Sprintf("window.__JV_ENV={os:%q,arch:%q,win11:%v};",
 		runtime.GOOS, runtime.GOARCH, win11)
-	mainWindowID = jadeview.CreateWindow(url, 0, &opts, &settings)
-	if mainWindowID == 0 {
+	windowID := jadeview.CreateWindow(url, 0, &opts, &settings)
+	if windowID == 0 {
 		fmt.Println("创建窗口失败")
 		jadeview.Exit()
 		return ""
 	}
-	fmt.Printf("[app-ready] 窗口创建成功 id=%d\n", mainWindowID)
+	mainWindowID.Store(windowID)
+	fmt.Printf("[app-ready] 窗口创建已受理 id=%d\n", windowID)
 
 	// Mica 材质仅 Win11；标题栏覆盖层仅 Windows（高 40，与页面 .title-bar / #app 网格行高一致）。
 	// 图标色初始按浅色主题给，前端探测到实际明暗后经 apply-titlebar 通道再同步。
 	// 非 Win11 平台的纯色背景由前端启动时经 set-backdrop(none) 随明暗主题设置。
 	if win11 {
-		jadeview.SetBackdrop(mainWindowID, jadeview.Backdrop.Mica)
+		jadeview.SetBackdrop(windowID, jadeview.Backdrop.Mica)
 	}
 	if runtime.GOOS == "windows" {
-		jadeview.SetTitlebarOverlayStyle(mainWindowID, titlebarHeight, "#1A1A1A", "#E5E5E5")
+		applyTitlebar(windowID, "#1A1A1A", "#E5E5E5")
 	}
 
 	setupTray()
@@ -318,12 +328,6 @@ func setupTray() {
 		jadeview.TraySetIconFromData(trayID, iconICO) // 内存图标，不落盘（.ico 是 Windows 格式）
 	}
 	jadeview.TraySetTooltip(trayID, "JadeView Go Demo")
-	jadeview.TraySetMenu(trayID, []jadeview.TrayMenuItem{
-		{Type: jadeview.TrayItem.Normal, Key: "show", Label: "显示窗口"},
-		{Type: jadeview.TrayItem.Normal, Key: "hide", Label: "隐藏窗口"},
-		{Type: jadeview.TrayItem.Divider, Key: "sep1"},
-		{Type: jadeview.TrayItem.Normal, Key: "quit", Label: "退出", Dangerous: true},
-	})
 	jadeview.TraySetVisible(trayID, true)
 	fmt.Printf("[托盘] 已创建 id=%d\n", trayID)
 }
@@ -354,8 +358,8 @@ func onDragDrop(_ uint32, data string) string {
 	if typ != "over" { // over 随鼠标移动高频触发，不刷控制台
 		fmt.Printf("[事件] drag-drop: %s\n", data)
 	}
-	if mainWindowID != 0 {
-		go jadeview.SendIPCMessage(mainWindowID, "drag-drop", data)
+	if view := jadeview.DefaultWebView(mainWindowID.Load()); view != 0 {
+		go jadeview.SendIPCMessage(view, "drag-drop", data)
 	}
 	switch typ {
 	case "enter":
@@ -368,24 +372,22 @@ func onDragDrop(_ uint32, data string) string {
 	return ""
 }
 
-func onTrayMenuCommand(_ uint32, data string) string {
-	fmt.Printf("[事件] tray-menu-command: %s\n", data)
-	// 载荷为 JSON，优先取被点菜单项的 key 精确匹配；
-	// 库未按 {"key":...} 回报时退回对原始载荷的子串匹配兜底。
-	key := jsonStr(data, "key")
-	if key == "" {
-		key = data
-	}
-	switch {
-	case strings.Contains(key, "show"):
-		jadeview.SetVisible(mainWindowID, true)
-		jadeview.SetFocus(mainWindowID)
-	case strings.Contains(key, "hide"):
-		jadeview.SetVisible(mainWindowID, false)
-	case strings.Contains(key, "quit"):
+func onMenuCommand(_ uint32, data string) string {
+	windowID := mainWindowID.Load()
+	switch jsonStr(data, "item_id") {
+	case "show":
+		jadeview.SetVisible(windowID, true)
+		jadeview.SetFocus(windowID)
+	case "hide":
+		jadeview.SetVisible(windowID, false)
+	case "quit":
 		jadeview.Exit()
 	}
 	return ""
+}
+
+func applyTitlebar(windowID uint32, foreground, hover string) {
+	jadeview.SetTitlebarStyle(windowID, jadeview.TitlebarStyleOptions{Height: titlebarHeight, ForegroundColor: foreground, ButtonHoverBackgroundColor: hover})
 }
 
 func registerIPCHandlers() {
@@ -404,7 +406,7 @@ func registerIPCHandlers() {
 		if mode == "" {
 			return "缺少 mode"
 		}
-		ok := jadeview.SetTheme(wid, mode)
+		ok := jadeview.SetTheme(jadeview.WebViewParentWindow(wid), mode)
 		return fmt.Sprintf("set_window_theme(%s): %v", mode, ok)
 	})
 
@@ -416,10 +418,10 @@ func registerIPCHandlers() {
 			return "标题栏: 前端自绘控制按钮（随主题自动换色，无需覆盖层）"
 		}
 		if strings.Contains(data, "true") {
-			jadeview.SetTitlebarOverlayStyle(wid, titlebarHeight, "#FFFFFF", "#3A3A3A")
+			applyTitlebar(jadeview.WebViewParentWindow(wid), "#FFFFFF", "#3A3A3A")
 			return "标题栏: 深色图标方案"
 		}
-		jadeview.SetTitlebarOverlayStyle(wid, titlebarHeight, "#1A1A1A", "#E5E5E5")
+		applyTitlebar(jadeview.WebViewParentWindow(wid), "#1A1A1A", "#E5E5E5")
 		return "标题栏: 浅色图标方案"
 	})
 
@@ -432,13 +434,13 @@ func registerIPCHandlers() {
 			if color == "" {
 				color = "#F3F3F3FF"
 			}
-			ok := jadeview.SetBackgroundColor(wid, color)
+			ok := jadeview.SetBackgroundColor(jadeview.WebViewParentWindow(wid), color)
 			return fmt.Sprintf("纯色背景 %s: %v", color, ok)
 		}
 		if runtime.GOOS != "windows" {
 			return "系统材质（Mica/Acrylic）仅 Windows 11 支持，请使用纯色背景"
 		}
-		ok := jadeview.SetBackdrop(wid, t)
+		ok := jadeview.SetBackdrop(jadeview.WebViewParentWindow(wid), t)
 		return fmt.Sprintf("set_window_backdrop(%s): %v", t, ok)
 	})
 
@@ -521,18 +523,18 @@ func registerIPCHandlers() {
 
 	// --- 异步对话框：弹框后立即返回，结果经 SendIPCMessage 推回页面 ---
 	jadeview.RegisterIPCHandler("open-file", func(wid uint32, _ string) string {
-		jadeview.ShowOpenDialogAsync(jadeview.FileDialogParams{WindowID: wid, Title: "选择文件"},
+		jadeview.ShowOpenDialogAsync(jadeview.FileDialogParams{WindowID: jadeview.WebViewParentWindow(wid), Title: "选择文件"},
 			func(result string) { jadeview.SendIPCMessage(wid, "dialog-result", result) })
 		return "打开对话框已弹出"
 	})
 	jadeview.RegisterIPCHandler("save-file", func(wid uint32, _ string) string {
-		jadeview.ShowSaveDialogAsync(jadeview.FileDialogParams{WindowID: wid, Title: "保存为"},
+		jadeview.ShowSaveDialogAsync(jadeview.FileDialogParams{WindowID: jadeview.WebViewParentWindow(wid), Title: "保存为"},
 			func(result string) { jadeview.SendIPCMessage(wid, "dialog-result", result) })
 		return "保存对话框已弹出"
 	})
 	jadeview.RegisterIPCHandler("msgbox", func(wid uint32, _ string) string {
 		jadeview.ShowMessageBoxAsync(jadeview.MessageBoxParams{
-			WindowID: wid, Title: "提示", Message: "这是一个来自 Go 的消息框",
+			WindowID: jadeview.WebViewParentWindow(wid), Title: "提示", Message: "这是一个来自 Go 的消息框",
 			Type: jadeview.MsgBoxType.Info, Buttons: `["确定","取消"]`,
 		}, func(result string) { jadeview.SendIPCMessage(wid, "dialog-result", result) })
 		return "消息框已弹出"
@@ -585,37 +587,37 @@ func registerIPCHandlers() {
 
 	// --- 窗口操作 ---
 	jadeview.RegisterIPCHandler("toggle-top", func(wid uint32, _ string) string {
-		alwaysOnTop = !alwaysOnTop
-		jadeview.SetAlwaysOnTop(wid, alwaysOnTop)
-		return fmt.Sprintf("置顶: %v", alwaysOnTop)
+		top := !alwaysOnTop.Load()
+		alwaysOnTop.Store(top)
+		jadeview.SetAlwaysOnTop(jadeview.WebViewParentWindow(wid), top)
+		return fmt.Sprintf("置顶: %v", top)
 	})
 	jadeview.RegisterIPCHandler("minimize", func(wid uint32, _ string) string {
-		jadeview.Minimize(wid)
+		jadeview.Minimize(jadeview.WebViewParentWindow(wid))
 		return "已最小化"
 	})
 	// maximize / close 供前端自绘控制按钮调用（非 Windows 的 no-titlebar 窗口）
 	jadeview.RegisterIPCHandler("maximize", func(wid uint32, _ string) string {
-		jadeview.ToggleMaximize(wid)
-		return fmt.Sprintf("最大化切换，当前: %v", jadeview.IsMaximized(wid))
+		jadeview.ToggleMaximize(jadeview.WebViewParentWindow(wid))
+		return fmt.Sprintf("最大化切换，当前: %v", jadeview.IsMaximized(jadeview.WebViewParentWindow(wid)))
 	})
 	jadeview.RegisterIPCHandler("close", func(wid uint32, _ string) string {
-		jadeview.Close(wid)
+		jadeview.Close(jadeview.WebViewParentWindow(wid))
 		return "关闭请求已发出"
 	})
 	jadeview.RegisterIPCHandler("bounds", func(wid uint32, _ string) string {
-		v, _ := jadeview.GetWindowBounds(wid)
+		v, _ := jadeview.GetWindowBounds(jadeview.WebViewParentWindow(wid))
 		return "窗口边界: " + v
 	})
 	jadeview.RegisterIPCHandler("hwnd", func(wid uint32, _ string) string {
-		// beta.9 起所有窗口可取句柄；GetWindowID 反查验证一致性。
 		// Linux 下句柄语义由库决定（可能为 0），此处仅作演示。
-		h := jadeview.GetWindowHWND(wid)
+		h := jadeview.GetWindowHWND(jadeview.WebViewParentWindow(wid))
 		back := jadeview.GetWindowID(h)
-		return fmt.Sprintf("HWND=0x%X → 反查窗口ID=%d（当前=%d）", h, back, wid)
+		return fmt.Sprintf("HWND=0x%X → 反查窗口ID=%d（当前=%d）", h, back, jadeview.WebViewParentWindow(wid))
 	})
 	jadeview.RegisterIPCHandler("fullscreen", func(wid uint32, _ string) string {
-		to := !jadeview.IsFullscreen(wid)
-		jadeview.SetFullscreen(wid, to)
+		to := !jadeview.IsFullscreen(jadeview.WebViewParentWindow(wid))
+		jadeview.SetFullscreen(jadeview.WebViewParentWindow(wid), to)
 		return fmt.Sprintf("全屏: %v", to)
 	})
 	jadeview.RegisterIPCHandler("devtools", func(wid uint32, _ string) string {
@@ -628,6 +630,6 @@ func registerIPCHandlers() {
 	})
 	jadeview.RegisterIPCHandler("flash", func(wid uint32, _ string) string {
 		// Windows 闪烁任务栏；Linux 对应 urgency 提示，依桌面环境而定
-		return fmt.Sprintf("闪烁窗口: %v", jadeview.FlashWindow(wid, 5))
+		return fmt.Sprintf("闪烁窗口: %v", jadeview.FlashWindow(jadeview.WebViewParentWindow(wid), 5))
 	})
 }

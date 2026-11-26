@@ -2,6 +2,12 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),版本号跟随上游 JadeView。
 
+## v3.0.0-beta.4
+
+- 升级原生库至 3.0 预览版（ABI `0x00030003`），Go 模块路径变更为 `github.com/luoxueyousheng/JadeViewGo/v3`。
+- 迁移创建配置、标题栏、事件与菜单；新增独立 WebView、空窗口和 64 位异步请求接口。
+- Windows 保持内嵌三架构 DLL；Linux amd64 默认使用纯 Go 动态加载 SO，支持 `CGO_ENABLED=0`，旧 cgo 后端可通过构建标签选择。上游未交付 Linux arm64 预览包。
+
 ## [v2.4.3] - 2026-09-27
 
 对应上游 JadeView **v2.4.3 (Build 26I01)**,刷新 Windows 三架构 DLL。已核对导出表:129 个公开 API 与 v2.4.0 官方头文件完全一致(另有 4 个内部辅助导出),API 无变化,Go 侧无需改动;头文件维持 2.4.0 版。Linux 库维持 v2.3.x(上游已停止 Linux 更新)。

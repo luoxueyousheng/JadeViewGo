@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && amd64 && jadeview_cgo && cgo
 
 package jadeview
 
@@ -88,9 +88,10 @@ import (
 )
 
 type eventReg struct {
-	event   string
-	handler EventHandler
-	cbID    uint32
+	event    string
+	handler  EventHandler
+	cbID     uint32
+	retiring bool
 }
 
 var (
@@ -99,14 +100,14 @@ var (
 )
 
 //export goEventDispatch
-func goEventDispatch(slot C.int, windowID C.uint32_t, data *C.char) *C.char {
+func goEventDispatch(slot C.int, sourceID C.uint32_t, data *C.char) *C.char {
 	evMu.Lock()
 	reg := evSlots[int(slot)]
 	evMu.Unlock()
 	if reg == nil || reg.handler == nil {
 		return nil
 	}
-	resp := reg.handler(uint32(windowID), C.GoString(data))
+	resp := reg.handler(uint32(sourceID), C.GoString(data))
 	if resp == "" {
 		return nil
 	}
@@ -151,22 +152,36 @@ func On(event string, handler EventHandler) (uint32, bool) {
 	return cbID, true
 }
 
-// Off 注销事件处理器。注销成功后才释放对应槽位。
+// Off 异步注销事件处理器；只有原生确认在途回调已结束后才复用槽位。
 func Off(event string, cbID uint32) bool {
-	cev := C.CString(event)
-	defer C.free(unsafe.Pointer(cev))
-	ok := C.jade_off(cev, C.uint32_t(cbID)) == 1
-	if !ok {
-		return false
-	}
 	evMu.Lock()
-	for i := range evSlots {
-		if r := evSlots[i]; r != nil && r.event == event && r.cbID == cbID {
-			evSlots[i] = nil
+	slot := -1
+	for i, r := range evSlots {
+		if r != nil && !r.retiring && r.event == event && r.cbID == cbID && cbID != 0 {
+			slot = i
+			r.retiring = true
 			break
 		}
 	}
 	evMu.Unlock()
+	if slot < 0 {
+		return false
+	}
+
+	cev := C.CString(event)
+	id := RequestID(C.jade_off_wait(cev, C.uint32_t(cbID)))
+	C.free(unsafe.Pointer(cev))
+	if id == 0 {
+		evMu.Lock()
+		evSlots[slot].retiring = false
+		evMu.Unlock()
+		return false
+	}
+	go drainEventRequest(id, func() {
+		evMu.Lock()
+		evSlots[slot] = nil
+		evMu.Unlock()
+	})
 	return true
 }
 

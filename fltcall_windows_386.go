@@ -13,3 +13,9 @@ func callF64I32(p *jvProc, id uint32, f float64) int32 {
 	r, _, _ := p.Call(uintptr(id), uintptr(uint32(b)), uintptr(uint32(b>>32)))
 	return i32(r)
 }
+
+// MSVC x86 的 double 按 8 字节自然对齐，C 结构体尾部补齐至 88 字节。
+type cWebViewSettings struct {
+	cWebViewSettingsFields
+	_ uint32
+}

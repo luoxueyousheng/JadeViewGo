@@ -1,7 +1,7 @@
-//go:build linux
+//go:build linux && amd64 && jadeview_cgo && cgo
 
 // Linux(cgo) 实现：生命周期函数（初始化、版本号、消息循环、退出）。
-// 静态链接 libJadeView.a，链接参数见 jadeview_linux_*.go。
+// 动态链接 libJadeView.so。
 package jadeview
 
 /*
@@ -12,6 +12,8 @@ package jadeview
 import "C"
 
 import (
+	"fmt"
+	"sync"
 	"unsafe"
 )
 
@@ -34,8 +36,11 @@ func boolToC(b bool) C.int32_t {
 //   - singleInstance: 是否启用单实例
 //
 // 返回 true 表示成功。注意：宿主仍应在 jade_on("app-ready", ...) 回调里
-// 判断 window_id 以确认初始化结果（详见头文件说明）。
+// 解析 JSON 的 ok 字段；回调来源 ID 为 0。
 func Init(enableDevmod bool, logPath, dataDir, appName, appSignature string, singleInstance bool) bool {
+	if Preload() != nil {
+		return false
+	}
 	cLog := C.CString(logPath)
 	cData := C.CString(dataDir)
 	cName := C.CString(appName)
@@ -64,9 +69,21 @@ func Version() string {
 	return cBufToString(buf)
 }
 
-// Preload 与 Windows 版对齐的占位实现：Linux 侧 libJadeView.a 为静态链接，
-// 无运行时加载步骤，恒返回 nil。跨平台代码可无条件调用。
-func Preload() error { return nil }
+var abiOnce sync.Once
+var abiErr error
+
+// Preload 校验动态链接的原生库 ABI。系统动态加载器在进程启动时解析共享库。
+func Preload() error {
+	abiOnce.Do(func() {
+		var info C.JadeAbiInfo
+		if code := C.jade_get_abi_info(&info, C.sizeof_JadeAbiInfo); code != 0 {
+			abiErr = fmt.Errorf("jade_get_abi_info: %d", code)
+			return
+		}
+		abiErr = checkABI(abiInfo{uint32(info.abi_version), uint32(info.pointer_bits), uint32(info.window_options_size), uint32(info.webview_settings_size)}, C.sizeof_WebViewWindowOptions, C.sizeof_WebViewSettings)
+	})
+	return abiErr
+}
 
 // RunMessageLoop 运行消息循环（阻塞，直到窗口全部关闭/退出）。
 func RunMessageLoop() {
@@ -76,4 +93,9 @@ func RunMessageLoop() {
 // Exit 清理所有窗口并结束消息循环。
 func Exit() {
 	C.jadeview_exit()
+}
+
+// ExitWait 发起退出并等待原生运行时收尾，返回库状态码。
+func ExitWait(timeoutMs uint32) int32 {
+	return int32(C.jadeview_exit_wait(C.uint32_t(timeoutMs)))
 }

@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && amd64 && jadeview_cgo && cgo
 
 package jadeview
 
@@ -41,25 +41,4 @@ func TraySetIconFromData(trayID uint32, data []byte) bool {
 		return false
 	}
 	return C.set_tray_icon_from_data(C.uint32_t(trayID), (*C.uint8_t)(unsafe.Pointer(&data[0])), C.uint32_t(len(data))) == 1
-}
-
-// TraySetMenu 用扁平表设置托盘根菜单（库内深拷贝字符串）。空切片表示清除菜单。
-func TraySetMenu(trayID uint32, items []TrayMenuItem) bool {
-	if len(items) == 0 {
-		return C.tray_set_menu_items(C.uint32_t(trayID), nil, 0) == 1
-	}
-	pool := &cstrPool{}
-	defer pool.free()
-	arr := make([]C.TrayMenuItemDesc, len(items))
-	for i, it := range items {
-		arr[i] = C.TrayMenuItemDesc{
-			item_type:  C.int32_t(it.Type),
-			key:        pool.s(it.Key),
-			label:      pool.s(it.Label),
-			parent_key: pool.s(it.ParentKey),
-			disabled:   b2i(it.Disabled),
-			dangerous:  b2i(it.Dangerous),
-		}
-	}
-	return C.tray_set_menu_items(C.uint32_t(trayID), &arr[0], C.uint32_t(len(arr))) == 1
 }

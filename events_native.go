@@ -1,25 +1,21 @@
-//go:build windows
+//go:build windows || (linux && amd64 && !jadeview_cgo)
 
 package jadeview
 
-// 事件回调桥接（Windows 纯 Go 版）：库的 IpcCallback 签名为 (window_id, data)，
-// 不携带事件名，因此为每个注册槽位建一个 syscall.NewCallback 跳板（闭包捕获槽位号），
-// 回调时查表找到对应的 Go 处理函数。NewCallback 创建的跳板进程内不可释放，
-// 故用固定槽位池复用（上限 MaxEventHandlers），与 Linux cgo 版的 C 跳板设计一致。
-//
-// IpcCallback 是 __stdcall（386 下有意义），对应 syscall.NewCallback。
+// 固定槽位为命名事件和 IPC 提供原生回调入口。
+// Windows x86 使用 stdcall；Linux x64 使用 System V ABI。
 
 import (
 	"runtime"
 	"sync"
-	"syscall"
 	"unsafe"
 )
 
 type eventReg struct {
-	event   string
-	handler EventHandler
-	cbID    uint32
+	event    string
+	handler  EventHandler
+	cbID     uint32
+	retiring bool
 }
 
 var (
@@ -32,21 +28,21 @@ var (
 func evTramp(slot int) uintptr {
 	if evTramps[slot] == 0 {
 		s := slot
-		evTramps[slot] = syscall.NewCallback(func(windowID, data uintptr) uintptr {
-			return goEventDispatch(s, windowID, data)
+		evTramps[slot] = newNativeCallback(func(sourceID, data uintptr) uintptr {
+			return goEventDispatch(s, sourceID, data)
 		})
 	}
 	return evTramps[slot]
 }
 
-func goEventDispatch(slot int, windowID, data uintptr) uintptr {
+func goEventDispatch(slot int, sourceID, data uintptr) uintptr {
 	evMu.Lock()
 	reg := evSlots[slot]
 	evMu.Unlock()
 	if reg == nil || reg.handler == nil {
 		return 0
 	}
-	resp := reg.handler(uint32(windowID), goString(data))
+	resp := reg.handler(uint32(sourceID), goString(data))
 	if resp == "" {
 		return 0
 	}
@@ -93,22 +89,37 @@ func On(event string, handler EventHandler) (uint32, bool) {
 	return cbID, true
 }
 
-// Off 注销事件处理器。注销成功后才释放对应槽位。
+// Off 异步注销事件处理器；只有原生确认在途回调已结束后才复用槽位。
 func Off(event string, cbID uint32) bool {
-	pool := &cstrs{}
-	r, _, _ := procJadeOff.Call(uintptr(unsafe.Pointer(pool.p(event))), uintptr(cbID))
-	runtime.KeepAlive(pool)
-	if i32(r) != 1 {
-		return false
-	}
 	evMu.Lock()
-	for i := range evSlots {
-		if reg := evSlots[i]; reg != nil && reg.event == event && reg.cbID == cbID {
-			evSlots[i] = nil
+	slot := -1
+	for i, r := range evSlots {
+		if r != nil && !r.retiring && r.event == event && r.cbID == cbID && cbID != 0 {
+			slot = i
+			r.retiring = true
 			break
 		}
 	}
 	evMu.Unlock()
+	if slot < 0 {
+		return false
+	}
+
+	pool := &cstrs{}
+	lo, hi, _ := procJadeOffWait.Call(uintptr(unsafe.Pointer(pool.p(event))), uintptr(cbID))
+	runtime.KeepAlive(pool)
+	id := requestID(lo, hi)
+	if id == 0 {
+		evMu.Lock()
+		evSlots[slot].retiring = false
+		evMu.Unlock()
+		return false
+	}
+	go drainEventRequest(id, func() {
+		evMu.Lock()
+		evSlots[slot] = nil
+		evMu.Unlock()
+	})
 	return true
 }
 
@@ -147,12 +158,12 @@ func RegisterIPCHandler(channel string, handler EventHandler) bool {
 // --- 网页权限处理器 ---
 
 // PermissionHandler 是统一网页权限处理回调（摄像头、麦克风、录屏、文件访问等）。
-// windowID 为触发请求的窗口；data 为库传入的权限请求 JSON（含权限类型、来源 URL 等，
+// webviewID 为触发请求的 WebView；data 为库传入的权限请求 JSON（含权限类型、来源 URL 等，
 // 具体字段以库版本为准）。返回 true=允许、false=拒绝。
 //
 // 与事件回调不同，此回调的返回值会同步影响 WebView2 的权限决策，应在其中尽快返回，
 // 不要在回调内执行阻塞或耗时操作。
-type PermissionHandler func(windowID uint32, data string) bool
+type PermissionHandler func(webviewID uint32, data string) bool
 
 var (
 	permMu      sync.Mutex
@@ -161,14 +172,14 @@ var (
 )
 
 // permTrampFn 是 PermissionCallback 的 __stdcall 跳板（返回 int32：1=允许，0=拒绝）。
-func permTrampFn(windowID, data uintptr) uintptr {
+func permTrampFn(webviewID, data uintptr) uintptr {
 	permMu.Lock()
 	h := permHandler
 	permMu.Unlock()
 	if h == nil {
 		return 0
 	}
-	if h(uint32(windowID), goString(data)) {
+	if h(uint32(webviewID), goString(data)) {
 		return 1
 	}
 	return 0
@@ -181,7 +192,7 @@ func SetWebviewPermissionHandler(handler PermissionHandler) bool {
 	permMu.Lock()
 	permHandler = handler
 	if permTramp == 0 {
-		permTramp = syscall.NewCallback(permTrampFn)
+		permTramp = newNativeCallback(permTrampFn)
 	}
 	permMu.Unlock()
 	if handler == nil {
