@@ -16,31 +16,19 @@ go get github.com/luoxueyousheng/JadeViewGo/v3@v3.0.0-beta.4
 
 Go 模块标签为 `v3.0.0-beta.4`，配套的原生运行库完整版本为 `3.0.0-beta.4.26K01`。
 
-## 运行示例
+## SDK 与示例
 
-Windows：
+| 内容 | 位置 |
+| --- | --- |
+| Go SDK、C 头文件、各平台原生运行库 | 仓库根模块、`include/` 与 `lib/` |
+| 基础示例 | [examples/](examples/README.md)，独立 Go 模块，不随 SDK 模块下载 |
+| 完整交互示例 | [JadeView Playground](https://github.com/luoxueyousheng/jadeview-playground)，独立仓库 |
 
-```powershell
-go run ./example
+SDK 导入路径不变。在根目录执行 `go test ./...` 测试 SDK；从根目录运行基础示例用 `go -C examples run ./basic`，各平台的构建和运行参数见 [示例 README](examples/README.md)。
 
-# 发布构建：缩小体积，并使用 GUI 子系统（不弹出命令提示符）
-go build -trimpath -ldflags '-s -w -H=windowsgui' -o ./jadeview-example.exe ./example
-```
+Windows 的 SDK 内嵌当前架构 DLL；可执行文件同目录的 `JadeView.dll` 优先。没有 Common Controls v6 声明的宿主在加载时会使用兼容激活上下文；需要分层子窗口时仍建议在宿主清单声明 Windows 8 或更新版本的兼容性。
 
-Windows 默认将内嵌 DLL 释放到 系统临时目录下的 `jadeview/` 目录中的内容寻址子目录。若 exe 同目录有 `JadeView.dll`，优先用它；`Preload()` 会检查 ABI、位数与配置布局。未声明 Common Controls v6 的宿主会在加载时自动使用兼容激活上下文。Windows 宿主建议在 exe 清单中声明 Windows 8 或更新版本的兼容性，以支持标题栏的分层子窗口。
-
-Linux x64（只需 Go 工具链即可构建）：
-
-```sh
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -o ./demo ./example
-JADEVIEW_LIBRARY=./lib/linux_amd64/libJadeView.so ./demo
-```
-
-Linux 默认使用 purego，不需要 C 编译器和开发头文件。加载顺序为 `JADEVIEW_LIBRARY` 指定的文件、可执行文件同目录的 `libJadeView.so`、系统动态库搜索路径。分发时可将 SO 放在可执行文件旁；没有 SO 或它的链接依赖时，`Preload()` 会报告加载错误。建窗还需要完整的 WebKitGTK 运行包（含辅助进程）与 GIO TLS 后端（Ubuntu 的 `glib-networking`），不能只复制 WebKitGTK 的 SO。
-
-需要回退旧实现时使用 `CGO_ENABLED=1 go build -tags jadeview_cgo ./example`，它仍需要 C 编译器和可用的原生链接依赖。托盘依赖桌面环境；使用 JAPK 挂载时还需 WinFsp 2.x（Windows）或 FUSE3（Linux）。
-
-示例默认通过回环地址提供内置网页，演示窗口、IPC、异步对话框、通知、YAML、剪贴板与托盘菜单，无需签名包即可启动。
+Linux 默认通过 purego 加载 `libJadeView.so`，顺序为 `JADEVIEW_LIBRARY`、可执行文件同目录、系统动态库搜索路径。目标机需要完整 WebKitGTK 运行包（含辅助进程）及 GIO TLS 后端；只有使用系统 JAPK 挂载时还需要 WinFsp 2.x 或 FUSE3。构建标签 `jadeview_cgo` 保留为旧 Linux 后端的显式选项。
 
 ## 快速开始
 

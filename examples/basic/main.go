@@ -7,10 +7,10 @@
 // YAML 持久化、剪贴板、NTP 网络时间、HWND/窗口ID 互查、显示器/系统信息。
 // 平台差异统一用 runtime.GOOS 分支处理，两端均可直接构建运行。
 //
-// 运行（详见 README「各平台使用方式」）：
+// 运行（从仓库根目录，见 examples/README.md）：
 //
-//	Windows: go run ./example            （纯 Go，无需 C 编译器，单 exe 自包含 DLL）
-//	Linux  : go run ./example            （默认纯 Go，运行时需 JadeView 动态库）
+//	Windows: go -C examples run ./basic            （纯 Go，无需 C 编译器，单 exe 自包含 DLL）
+//	Linux  : go -C examples run ./basic            （默认纯 Go，运行时需 JadeView 动态库）
 //
 // 关键时序（官方要求）：
 //  1. app-ready 必须在 Init 之前注册；
@@ -39,7 +39,7 @@ import (
 // 前端站点（HTML/CSS/JS，含子目录）。加载方式三选一，见 onAppReady 里的 plan：
 //
 //	0 JAPK 资源包（app.japk 内存加载 + 协议服务 JAPK 模式，加密/混淆分发）
-//	1 协议服务挂 example/site 源码目录（hotReload 即时刷新，开发调试）
+//	1 协议服务挂 basic/site 源码目录（hotReload 即时刷新，开发调试）
 //	2 进程内回环 HTTP 直出 embed.FS（零落盘，单 exe 分发）——siteFS 即为此保留
 //
 // `all:` 前缀确保以 . 和 _ 开头的文件也被包含。
@@ -160,7 +160,7 @@ func onAppReady(_ uint32, data string) string {
 	// 前端加载方式（三选一）：
 	//   0 = JAPK 资源包：go:embed 的 app.japk 内存加载（请使用与 Init 配置一致、可通过原生验证的签名包），
 	//       再以空路径调 SetProtocolServicePath——协议服务转为内存 JAPK 模式；
-	//   1 = 协议服务挂 example/site 源码目录（hotReload：改页面文件即时刷新，适合开发调试）；
+	//   1 = 协议服务挂 basic/site 源码目录（hotReload：改页面文件即时刷新，适合开发调试）；
 	//   2 = 进程内 127.0.0.1 HTTP 直出 embed.FS（零落盘，适合分发单 exe）。
 	// 三种方式返回的 URL 都直接用于建窗导航（JAPK 模式形如 JADE://<app_signature>）。
 	plan := 2
@@ -266,18 +266,17 @@ func onAppReady(_ uint32, data string) string {
 	return ""
 }
 
-// resolveSiteDir 定位 example/site 源码目录（按 go run ./example 与 example/ 内运行
-// 两种常见工作目录探测），返回绝对路径。协议服务只接受磁盘目录。
+// resolveSiteDir 从仓库根目录、示例模块或 basic 目录定位站点源码。
 func resolveSiteDir() (string, error) {
-	for _, dir := range []string{"example/site", "site"} {
+	for _, dir := range []string{"site", "basic/site", "examples/basic/site"} {
 		if st, err := os.Stat(dir); err == nil && st.IsDir() {
 			return filepath.Abs(dir)
 		}
 	}
-	return "", fmt.Errorf("未找到 example/site（请在模块根目录用 go run ./example 运行）")
+	return "", fmt.Errorf("未找到示例站点，请检查 examples/basic/site")
 }
 
-// serveSite（备用方案，当前已屏蔽）在 127.0.0.1 随机端口上起 HTTP 服务，直接以
+// serveSite 在 127.0.0.1 随机端口上起 HTTP 服务，直接以
 // go:embed 的 site/ 为根，返回入口 URL。前端文件全程只存在于 exe 内，磁盘零副本。
 // 仅监听回环地址；生产环境若担心本机其它进程访问，可在 Handler 外再校验随机 token。
 func serveSite() (string, error) {
