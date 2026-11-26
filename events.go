@@ -79,6 +79,9 @@ static const char* JADEVIEW_CALL jv_tr62(uint32_t w, const char* d){ return goEv
 static const char* JADEVIEW_CALL jv_tr63(uint32_t w, const char* d){ return goEventDispatch(63, w, (char*)d); }
 static IpcCallback jv_tramps[64] = {jv_tr0, jv_tr1, jv_tr2, jv_tr3, jv_tr4, jv_tr5, jv_tr6, jv_tr7, jv_tr8, jv_tr9, jv_tr10, jv_tr11, jv_tr12, jv_tr13, jv_tr14, jv_tr15, jv_tr16, jv_tr17, jv_tr18, jv_tr19, jv_tr20, jv_tr21, jv_tr22, jv_tr23, jv_tr24, jv_tr25, jv_tr26, jv_tr27, jv_tr28, jv_tr29, jv_tr30, jv_tr31, jv_tr32, jv_tr33, jv_tr34, jv_tr35, jv_tr36, jv_tr37, jv_tr38, jv_tr39, jv_tr40, jv_tr41, jv_tr42, jv_tr43, jv_tr44, jv_tr45, jv_tr46, jv_tr47, jv_tr48, jv_tr49, jv_tr50, jv_tr51, jv_tr52, jv_tr53, jv_tr54, jv_tr55, jv_tr56, jv_tr57, jv_tr58, jv_tr59, jv_tr60, jv_tr61, jv_tr62, jv_tr63};
 static IpcCallback jv_get_tramp(int i){ return jv_tramps[i]; }
+extern int32_t goPermissionDispatch(uint32_t view, char* data);
+static int32_t jv_permission(uint32_t view, const char* data) {return goPermissionDispatch(view, (char*)data);}
+static PermissionCallback jv_perm_tramp(void){return jv_permission;}
 */
 import "C"
 
@@ -213,4 +216,15 @@ func RegisterIPCHandler(channel string, handler EventHandler) bool {
 		return false
 	}
 	return true
+}
+
+//export goPermissionDispatch
+func goPermissionDispatch(view C.uint32_t, data *C.char) C.int32_t {
+	return C.int32_t(permissionDecision(uint32(view), C.GoString(data)))
+}
+func setPermissionCallback(enable bool) bool {
+	if !enable {
+		return C.clear_webview_permission_handler() == 1
+	}
+	return C.set_webview_permission_handler(C.jv_perm_tramp()) == 1
 }

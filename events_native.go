@@ -157,54 +157,20 @@ func RegisterIPCHandler(channel string, handler EventHandler) bool {
 
 // --- 网页权限处理器 ---
 
-// PermissionHandler 是统一网页权限处理回调（摄像头、麦克风、录屏、文件访问等）。
-// webviewID 为触发请求的 WebView；data 为库传入的权限请求 JSON（含权限类型、来源 URL 等，
-// 具体字段以库版本为准）。返回 true=允许、false=拒绝。
-//
-// 与事件回调不同，此回调的返回值会同步影响 WebView2 的权限决策，应在其中尽快返回，
-// 不要在回调内执行阻塞或耗时操作。
-type PermissionHandler func(webviewID uint32, data string) bool
+var permissionCallbackOnce sync.Once
+var permissionCallback uintptr
 
-var (
-	permMu      sync.Mutex
-	permHandler PermissionHandler
-	permTramp   uintptr
-)
-
-// permTrampFn 是 PermissionCallback 的 __stdcall 跳板（返回 int32：1=允许，0=拒绝）。
-func permTrampFn(webviewID, data uintptr) uintptr {
-	permMu.Lock()
-	h := permHandler
-	permMu.Unlock()
-	if h == nil {
-		return 0
+func setPermissionCallback(enable bool) bool {
+	if !enable {
+		r, _, _ := procClearWebviewPermissionHandler.Call()
+		return i32(r) == 1
 	}
-	if h(uint32(webviewID), goString(data)) {
-		return 1
-	}
-	return 0
-}
-
-// SetWebviewPermissionHandler 注册统一网页权限处理器。
-// 传入非 nil 的处理器即注册；传入 nil 等价于 ClearWebviewPermissionHandler（注销）。
-// 返回 true 表示库侧注册成功。
-func SetWebviewPermissionHandler(handler PermissionHandler) bool {
-	permMu.Lock()
-	permHandler = handler
-	if permTramp == 0 {
-		permTramp = newNativeCallback(permTrampFn)
-	}
-	permMu.Unlock()
-	if handler == nil {
-		_, _, _ = procClearWebviewPermissionHandler.Call()
-		return true
-	}
-	r, _, _ := procSetWebviewPermissionHandler.Call(permTramp)
-	return i32(r) == 1
-}
-
-// ClearWebviewPermissionHandler 注销统一网页权限处理器。
-func ClearWebviewPermissionHandler() bool {
-	r, _, _ := procClearWebviewPermissionHandler.Call()
+	permissionCallbackOnce.Do(func() {
+		permissionCallback = newNativeCallback(func(view, data uintptr) uintptr {
+			decision := permissionDecision(uint32(view), goString(data))
+			return uintptr(uint32(decision))
+		})
+	})
+	r, _, _ := procSetWebviewPermissionHandler.Call(permissionCallback)
 	return i32(r) == 1
 }

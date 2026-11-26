@@ -22,15 +22,18 @@ Windows：
 
 ```powershell
 go run ./example
+
+# 发布构建：缩小体积，并使用 GUI 子系统（不弹出命令提示符）
+go build -trimpath -ldflags '-s -w -H=windowsgui' -o ./jadeview-example.exe ./example
 ```
 
-Windows 默认将内嵌 DLL 释放到 `%TEMP%\jadeview\` 下的内容寻址子目录。若 exe 同目录有 `JadeView.dll`，优先用它；`Preload()` 会检查 ABI、位数与配置布局。未声明 Common Controls v6 的宿主会在加载时自动使用兼容激活上下文。Windows 宿主建议在 exe 清单中声明 Windows 8 或更新版本的兼容性，以支持标题栏的分层子窗口。
+Windows 默认将内嵌 DLL 释放到 系统临时目录下的 `jadeview/` 目录中的内容寻址子目录。若 exe 同目录有 `JadeView.dll`，优先用它；`Preload()` 会检查 ABI、位数与配置布局。未声明 Common Controls v6 的宿主会在加载时自动使用兼容激活上下文。Windows 宿主建议在 exe 清单中声明 Windows 8 或更新版本的兼容性，以支持标题栏的分层子窗口。
 
 Linux x64（只需 Go 工具链即可构建）：
 
 ```sh
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/jadeview-example ./example
-JADEVIEW_LIBRARY="$PWD/lib/linux_amd64/libJadeView.so" /tmp/jadeview-example
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -o ./demo ./example
+JADEVIEW_LIBRARY=./lib/linux_amd64/libJadeView.so ./demo
 ```
 
 Linux 默认使用 purego，不需要 C 编译器和开发头文件。加载顺序为 `JADEVIEW_LIBRARY` 指定的文件、可执行文件同目录的 `libJadeView.so`、系统动态库搜索路径。分发时可将 SO 放在可执行文件旁；没有 SO 或它的链接依赖时，`Preload()` 会报告加载错误。建窗还需要完整的 WebKitGTK 运行包（含辅助进程）与 GIO TLS 后端（Ubuntu 的 `glib-networking`），不能只复制 WebKitGTK 的 SO。

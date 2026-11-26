@@ -149,32 +149,46 @@ func (s *WebViewSettings) toC(pool *cstrs) *cWebViewSettings {
 // CreateWindow 创建 Window 和默认 WebView，返回 Window ID。nil 配置使用原生默认值。
 func CreateWindow(url string, parentID uint32, opts *WindowOptions, settings *WebViewSettings) uint32 {
 	pool := &cstrs{}
-	co, cs, f := opts.toC(pool), settings.toC(pool), opts.features()
+	co, cs, f := opts.toC(pool), settings.toC(pool), opts.features(pool)
 	r, _, _ := procCreateWebviewWindow.Call(uintptr(unsafe.Pointer(pool.p(url))), uintptr(parentID), uintptr(unsafe.Pointer(co)), uintptr(unsafe.Pointer(cs)), uintptr(unsafe.Pointer(f)))
 	runtime.KeepAlive(pool)
+	runtime.KeepAlive(opts)
 	return uint32(r)
 }
 
 // CreateEmptyWindow 创建不带 WebView 的原生 Window。
 func CreateEmptyWindow(parentID uint32, opts *WindowOptions) uint32 {
 	pool := &cstrs{}
-	co, f := opts.toC(pool), opts.features()
+	co, f := opts.toC(pool), opts.features(pool)
 	r, _, _ := procCreateEmptyWindow.Call(uintptr(parentID), uintptr(unsafe.Pointer(co)), uintptr(unsafe.Pointer(f)))
 	runtime.KeepAlive(pool)
+	runtime.KeepAlive(opts)
 	return uint32(r)
 }
 
-func (o *WindowOptions) features() *cWindowFeatures {
-	if o == nil || (!o.ContentProtection && !o.AutoSaveState) {
+func (o *WindowOptions) features(pool *cstrs) *cWindowFeatures {
+	if o == nil || (!o.ContentProtection && !o.AutoSaveState && o.Splash == nil) {
 		return nil
 	}
-	return &cWindowFeatures{size: uint32(unsafe.Sizeof(cWindowFeatures{})), abi: ABIVersion, contentProtection: bi32(o.ContentProtection), autoSaveState: bi32(o.AutoSaveState)}
+	f := &cWindowFeatures{size: uint32(unsafe.Sizeof(cWindowFeatures{})), abi: ABIVersion, contentProtection: bi32(o.ContentProtection), autoSaveState: bi32(o.AutoSaveState)}
+	if s := o.Splash; s != nil {
+		f.splash = &cSplashOptions{size: uint32(unsafe.Sizeof(cSplashOptions{})), abi: ABIVersion, flags: uint32(b2u(s.Disabled)),
+			path: pool.p(s.LogoPath), data: unsafe.SliceData(s.LogoData), dataSize: uintptr(len(s.LogoData)), background: s.BackgroundColor, accent: s.AccentColor, minimumMS: s.MinimumMS}
+	}
+	return f
 }
 
 type cWindowFeatures struct {
 	size, abi                        uint32
 	contentProtection, autoSaveState int32
-	splash                           *byte
+	splash                           *cSplashOptions
+}
+
+type cSplashOptions struct {
+	size, abi, flags              uint32
+	path, data                    *byte
+	dataSize                      uintptr
+	background, accent, minimumMS uint32
 }
 
 // --- 常用窗口操作（薄封装） ---

@@ -2,6 +2,10 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),版本号跟随上游 JadeView。
 
+## 未发布
+
+- 封装窗口启动画面、三态网页权限回调、资源交付能力与诊断，以及 JAPK 挂载能力。
+
 ## v3.0.0-beta.4
 
 - 升级原生库至 3.0 预览版（ABI `0x00030003`），Go 模块路径变更为 `github.com/luoxueyousheng/JadeViewGo/v3`。
