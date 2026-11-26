@@ -67,3 +67,7 @@ func SetContextMenu(webviewID uint32, items []ContextMenuItem) bool {
 	}
 	return C.jade_webview_set_context_menu(C.uint32_t(webviewID), unsafe.SliceData(a), C.uint32_t(len(a))) == 1
 }
+
+func ClearContextMenu(view uint32) bool {
+	return C.jade_webview_clear_context_menu(C.uint32_t(view)) == 1
+}

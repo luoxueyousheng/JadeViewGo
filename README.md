@@ -22,15 +22,18 @@ Windows：
 
 ```powershell
 go run ./example
+
+# 发布构建：缩小体积，并使用 GUI 子系统（不弹出命令提示符）
+go build -trimpath -ldflags '-s -w -H=windowsgui' -o ./jadeview-example.exe ./example
 ```
 
-Windows 默认将内嵌 DLL 释放到 `%TEMP%\jadeview\` 下的内容寻址子目录。若 exe 同目录有 `JadeView.dll`，优先用它；`Preload()` 会检查 ABI、位数与配置布局。未声明 Common Controls v6 的宿主会在加载时自动使用兼容激活上下文。Windows 宿主建议在 exe 清单中声明 Windows 8 或更新版本的兼容性，以支持标题栏的分层子窗口。
+Windows 默认将内嵌 DLL 释放到 系统临时目录下的 `jadeview/` 目录中的内容寻址子目录。若 exe 同目录有 `JadeView.dll`，优先用它；`Preload()` 会检查 ABI、位数与配置布局。未声明 Common Controls v6 的宿主会在加载时自动使用兼容激活上下文。Windows 宿主建议在 exe 清单中声明 Windows 8 或更新版本的兼容性，以支持标题栏的分层子窗口。
 
 Linux x64（只需 Go 工具链即可构建）：
 
 ```sh
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/jadeview-example ./example
-JADEVIEW_LIBRARY="$PWD/lib/linux_amd64/libJadeView.so" /tmp/jadeview-example
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -o ./demo ./example
+JADEVIEW_LIBRARY=./lib/linux_amd64/libJadeView.so ./demo
 ```
 
 Linux 默认使用 purego，不需要 C 编译器和开发头文件。加载顺序为 `JADEVIEW_LIBRARY` 指定的文件、可执行文件同目录的 `libJadeView.so`、系统动态库搜索路径。分发时可将 SO 放在可执行文件旁；没有 SO 或它的链接依赖时，`Preload()` 会报告加载错误。建窗还需要完整的 WebKitGTK 运行包（含辅助进程）与 GIO TLS 后端（Ubuntu 的 `glib-networking`），不能只复制 WebKitGTK 的 SO。
@@ -90,4 +93,20 @@ func main() {
 - 托盘右键监听 `EventTrayEvent` 后用 `PopupMenu` 弹出菜单，在 `EventMenuCommand` 中读取字符串 `item_id`；网页右键模板用 `SetContextMenu`。
 - 普通命名事件仍用 `On` / `Off`；已进入的回调可在 `Off` 返回后继续执行，Go 在原生确认回调结束后才复用槽位。
 
-本次升级迁移现有绑定及核心 v3 功能，不代表头文件中的每项新增接口都已提供 Go 封装。完整声明见 [JadeView.h](include/JadeView.h)，版本变更见 [CHANGELOG](CHANGELOG.md)。
+## beta.4 API 覆盖
+
+本节描述当前源码的覆盖范围；已发布的 `v3.0.0-beta.4` 标签不含以下新增封装。Go 封装会在边界上复制原生数据并释放原生内存，不需要宿主手动释放原生指针。
+
+| 功能 | Go 接口 |
+| --- | --- |
+| ABI 查询 | `GetABIInfo` |
+| 结构化事件 | `OnAppEvent`、`OnWindowEvent`、`OnWebViewEvent`、`UnsubscribeEvent` |
+| 事件快照 | 回调收到 Go 拥有的 `TypedEvent`；可保留或调用 `Clone`，无需 `event_clone/event_free` |
+| JAPK 注册与挂载 | `RegisterJAPK`、`RegisterLoadedJAPK`、`MountJAPK`、`GetJAPKMountCapabilities`、`GetJAPKMountRoot`、`GetJAPKMountState`、`UnmountJAPK`、`UnregisterJAPK` |
+| 资源交付 | `RegisterResourceEx`、`GetResourceCapabilities`、`GetResourceDeliveryMode`、`GetResourceDeliveryInfo` |
+| 错误详情 | `LastError`、`LastErrorCode`、`LastErrorMessage`；原生错误按 OS 线程保存，失败调用和读取错误应在同一个 `runtime.LockOSThread` 区域 |
+| 菜单与存储 | `ClearContextMenu`、`YAMLGetStr`。Linux 的 `YAMLGetStr` 使用等价缓冲区接口，避免依赖 Windows COM 分配器 |
+
+结构化订阅的注销返回 `RequestID`，调用者用 `GetRequestResult` 查询并用 `ReleaseRequest` 释放；不要在回调内部等待自身注销。命名事件优先用 `Off`；`OffImmediate` 无完成请求，为免迟到的原生回调误投，隔离原槽位直到进程退出。
+
+原生接口有平台限制：原生文件交付模式仅 Windows 提供；真正的 JAPK 系统挂载仍需 WinFsp 或 FUSE3。完整原生声明见 [JadeView.h](include/JadeView.h)，版本变更见 [CHANGELOG](CHANGELOG.md)。

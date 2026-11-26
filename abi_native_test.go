@@ -37,3 +37,38 @@ func TestNativeConfigLayout(t *testing.T) {
 		t.Fatal("unexpected native config translation")
 	}
 }
+
+func TestSplashConfigLayout(t *testing.T) {
+	wantSize, wantPath, wantDuration := uintptr(56), uintptr(16), uintptr(48)
+	if unsafe.Sizeof(uintptr(0)) == 4 {
+		wantSize, wantPath, wantDuration = 36, 12, 32
+	}
+	var s cSplashOptions
+	if unsafe.Sizeof(s) != wantSize || unsafe.Offsetof(s.path) != wantPath || unsafe.Offsetof(s.minimumMS) != wantDuration {
+		t.Fatalf("Splash layout: %d/%d/%d", unsafe.Sizeof(s), unsafe.Offsetof(s.path), unsafe.Offsetof(s.minimumMS))
+	}
+	pool := &cstrs{}
+	o := DefaultWindowOptions()
+	o.Splash = &SplashOptions{LogoData: []byte{137, 80, 78, 71}, MinimumMS: 123, BackgroundColor: 0xff000000}
+	f := o.features(pool)
+	if f == nil || f.splash == nil || f.splash.size != uint32(wantSize) || f.splash.abi != ABIVersion ||
+		f.splash.minimumMS != 123 || f.splash.dataSize != 4 || f.splash.data == nil || *f.splash.data != 137 {
+		t.Fatalf("bad splash conversion: %+v", f)
+	}
+}
+
+func TestResourceAndJAPKLayouts(t *testing.T) {
+	if got := unsafe.Sizeof(ResourceCapabilities{}); got != 24 {
+		t.Errorf("resource caps layout: %d", got)
+	}
+	if got := unsafe.Sizeof(JAPKMountCapabilities{}); got != 20 {
+		t.Errorf("mount caps layout: %d", got)
+	}
+	want := uintptr(24)
+	if unsafe.Sizeof(uintptr(0)) == 4 {
+		want = 16
+	}
+	if got := unsafe.Sizeof(cResourceDelivery{}); got != want {
+		t.Errorf("delivery layout: %d", got)
+	}
+}

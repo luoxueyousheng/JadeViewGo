@@ -67,6 +67,7 @@ func Preload() error {
 			abiErr = fmt.Errorf("jade_get_abi_info (%s): %d", d.Name, i32(r))
 			return
 		}
+		loadedABI = info
 		abiErr = checkABI(info, unsafe.Sizeof(cWindowOptions{}), unsafe.Sizeof(cWebViewSettings{}))
 	})
 	return abiErr

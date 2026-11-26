@@ -128,7 +128,7 @@ func CreateWindow(url string, parentID uint32, opts *WindowOptions, settings *We
 	if err := Preload(); err != nil {
 		return 0
 	}
-	return uint32(C.create_webview_window(pool.s(url), C.uint32_t(parentID), opts.toC(pool), settings.toC(pool), opts.features()))
+	return uint32(C.create_webview_window(pool.s(url), C.uint32_t(parentID), opts.toC(pool), settings.toC(pool), opts.features(pool)))
 }
 
 // CreateEmptyWindow 创建不带 WebView 的原生 Window。
@@ -138,14 +138,34 @@ func CreateEmptyWindow(parentID uint32, opts *WindowOptions) uint32 {
 	if err := Preload(); err != nil {
 		return 0
 	}
-	return uint32(C.create_window(C.uint32_t(parentID), opts.toC(pool), opts.features()))
+	return uint32(C.create_window(C.uint32_t(parentID), opts.toC(pool), opts.features(pool)))
 }
 
-func (o *WindowOptions) features() *C.JadeWindowFeatures {
-	if o == nil || (!o.ContentProtection && !o.AutoSaveState) {
+func (o *WindowOptions) features(pool *cstrPool) *C.JadeWindowFeatures {
+	if o == nil || (!o.ContentProtection && !o.AutoSaveState && o.Splash == nil) {
 		return nil
 	}
-	return &C.JadeWindowFeatures{struct_size: C.sizeof_JadeWindowFeatures, abi_version: C.uint32_t(ABIVersion), content_protection: b2i(o.ContentProtection), auto_save_state: b2i(o.AutoSaveState)}
+	f := &C.JadeWindowFeatures{struct_size: C.sizeof_JadeWindowFeatures, abi_version: C.uint32_t(ABIVersion), content_protection: b2i(o.ContentProtection), auto_save_state: b2i(o.AutoSaveState)}
+	if s := o.Splash; s != nil {
+		// cgo 不允许 C 结构内嵌 Go 指针。两层原生结构以及 LOGO 都放到 C 内存。
+		raw := C.calloc(1, C.sizeof_JadeSplashOptions)
+		if raw == nil {
+			return nil
+		}
+		pool.ptrs = append(pool.ptrs, raw)
+		dst := (*C.JadeSplashOptions)(raw)
+		*dst = C.JadeSplashOptions{struct_size: C.sizeof_JadeSplashOptions, abi_version: C.uint32_t(ABIVersion),
+			flags: C.uint32_t(b2i(s.Disabled)), logo_path: pool.s(s.LogoPath), background_color: C.uint32_t(s.BackgroundColor),
+			accent_color: C.uint32_t(s.AccentColor), minimum_ms: C.uint32_t(s.MinimumMS)}
+		if len(s.LogoData) > 0 {
+			buf := C.CBytes(s.LogoData)
+			pool.ptrs = append(pool.ptrs, buf)
+			dst.logo_data = (*C.uint8_t)(buf)
+			dst.logo_data_size = C.size_t(len(s.LogoData))
+		}
+		f.splash = dst
+	}
+	return f
 }
 
 // --- 常用窗口操作（薄封装） ---

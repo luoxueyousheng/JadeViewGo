@@ -30,7 +30,7 @@ func Preload() error {
 			linuxLoadErr = err
 			return
 		}
-		linuxHandle, linuxLoadErr = loadLinuxLibrary(path)
+		linuxHandle, loadedABI, linuxLoadErr = loadLinuxLibrary(path)
 	})
 	return linuxLoadErr
 }
@@ -54,30 +54,31 @@ func linuxLibraryPath() (string, error) {
 	return linuxLibrary, nil
 }
 
-func loadLinuxLibrary(path string) (uintptr, error) {
+func loadLinuxLibrary(path string) (uintptr, abiInfo, error) {
 	handle, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_LOCAL)
 	if err != nil {
-		return 0, fmt.Errorf("加载 %s: %w", path, err)
+		return 0, abiInfo{}, fmt.Errorf("加载 %s: %w", path, err)
 	}
-	if err := checkLinuxABI(handle); err != nil {
+	info, err := readLinuxABI(handle)
+	if err != nil {
 		_ = purego.Dlclose(handle)
-		return 0, fmt.Errorf("%s: %w", path, err)
+		return 0, abiInfo{}, fmt.Errorf("%s: %w", path, err)
 	}
-	return handle, nil
+	return handle, info, nil
 }
 
-func checkLinuxABI(handle uintptr) error {
+func readLinuxABI(handle uintptr) (abiInfo, error) {
 	addr, err := purego.Dlsym(handle, "jade_get_abi_info")
 	if err != nil {
-		return fmt.Errorf("缺少 jade_get_abi_info: %w", err)
+		return abiInfo{}, fmt.Errorf("缺少 jade_get_abi_info: %w", err)
 	}
 	var getABI func(*abiInfo, uintptr) int32
 	purego.RegisterFunc(&getABI, addr)
 	var info abiInfo
 	if code := getABI(&info, unsafe.Sizeof(info)); code != 0 {
-		return fmt.Errorf("jade_get_abi_info: %d", code)
+		return abiInfo{}, fmt.Errorf("jade_get_abi_info: %d", code)
 	}
-	return checkABI(info, unsafe.Sizeof(cWindowOptions{}), unsafe.Sizeof(cWebViewSettings{}))
+	return info, checkABI(info, unsafe.Sizeof(cWindowOptions{}), unsafe.Sizeof(cWebViewSettings{}))
 }
 
 type jvProc struct {

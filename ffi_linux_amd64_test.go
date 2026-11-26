@@ -20,7 +20,7 @@ func TestLinuxLibraryOverride(t *testing.T) {
 }
 
 func TestLinuxRejectsIncompatibleLibrary(t *testing.T) {
-	lib, err := loadLinuxLibrary("libc.so.6")
+	lib, _, err := loadLinuxLibrary("libc.so.6")
 	if lib != 0 || err == nil || !strings.Contains(err.Error(), "jade_get_abi_info") {
 		t.Fatalf("loadLinuxLibrary: handle=%#x, err=%v", lib, err)
 	}

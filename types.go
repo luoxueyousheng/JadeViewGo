@@ -5,6 +5,8 @@ package jadeview
 
 // WindowOptions 对应 C 的 WebViewWindowOptions。
 type WindowOptions struct {
+	// Splash 可选；预览运行库在 Windows 绘制启动画面。
+	Splash              *SplashOptions
 	Title               string
 	Width               int
 	Height              int
@@ -152,4 +154,69 @@ type TitlebarStyleOptions struct {
 	Height                                                  int
 	BackgroundColor, ForegroundColor, ButtonBackgroundColor string
 	ButtonHoverBackgroundColor, ButtonHoverForegroundColor  string
+}
+
+// SplashOptions 描述窗口启动画面。颜色编码为 0xAARRGGBB。
+// LogoData 优先于 LogoPath。若两者都为空，则仅显示加载动画。
+type SplashOptions struct {
+	LogoPath                     string
+	LogoData                     []byte
+	BackgroundColor, AccentColor uint32
+	MinimumMS                    uint32
+	Disabled                     bool
+}
+
+// PermissionDecision 是浏览器的同步权限决策。
+type PermissionDecision int32
+
+const (
+	PermissionDeny    PermissionDecision = -1
+	PermissionDefault PermissionDecision = 0
+	PermissionAllow   PermissionDecision = 1
+)
+
+// PermissionHandler 返回 true 允许，false 拒绝；需要浏览器默认行为时使用三态处理器。
+type PermissionHandler func(webviewID uint32, data string) bool
+
+// PermissionDecisionHandler 返回三态决策。回调可能在 GUI 线程执行，不能阻塞。
+type PermissionDecisionHandler func(webviewID uint32, data string) PermissionDecision
+
+func normalizePermission(d PermissionDecision) PermissionDecision {
+	if d == PermissionDefault || d == PermissionAllow {
+		return d
+	}
+	return PermissionDeny
+}
+
+// ResourceCapabilities 是指定 WebView 的资源交付能力与计数。
+type ResourceCapabilities struct {
+	SupportedModes                 uint32 `json:"supported_modes"`
+	NativeRequiresPrivateView      uint32 `json:"native_requires_private_view"`
+	NativeRequiresPermanent        uint32 `json:"native_requires_permanent"`
+	NativeRequiresDedicatedProfile uint32 `json:"native_requires_dedicated_profile"`
+	NativeRegistered               uint32 `json:"native_registered"`
+	NativePendingCleanup           uint32 `json:"native_pending_cleanup"`
+}
+
+type ResourceMode uint32
+
+const (
+	ResourceControlled ResourceMode = iota
+	ResourceNative
+)
+
+// ResourceDeliveryInfo 中的字符串已复制到 Go 内存，不需要调用者释放。
+type ResourceDeliveryInfo struct {
+	Mode            ResourceMode
+	Reason          uint32
+	NativeErrorCode int32
+	Message         string
+}
+
+type JAPKMountCapabilities struct {
+	Backend               uint32 `json:"backend"`
+	Available             int32  `json:"available"`
+	ReadOnly              int32  `json:"read_only"`
+	CachesPlaintextToDisk int32  `json:"caches_plaintext_to_disk"`
+	OriginalArchivePrefix int32  `json:"original_archive_prefix"`
 }

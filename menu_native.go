@@ -90,3 +90,11 @@ func SetContextMenu(webviewID uint32, items []ContextMenuItem) bool {
 	runtime.KeepAlive(pool)
 	return i32(r) == 1
 }
+
+var procClearContextMenu = np("jade_webview_clear_context_menu")
+
+// ClearContextMenu 恢复指定 WebView 的引擎默认右键菜单。
+func ClearContextMenu(view uint32) bool {
+	r, _, _ := procClearContextMenu.Call(uintptr(view))
+	return i32(r) == 1
+}

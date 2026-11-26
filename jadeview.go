@@ -80,7 +80,8 @@ func Preload() error {
 			abiErr = fmt.Errorf("jade_get_abi_info: %d", code)
 			return
 		}
-		abiErr = checkABI(abiInfo{uint32(info.abi_version), uint32(info.pointer_bits), uint32(info.window_options_size), uint32(info.webview_settings_size)}, C.sizeof_WebViewWindowOptions, C.sizeof_WebViewSettings)
+		loadedABI = abiInfo{uint32(info.abi_version), uint32(info.pointer_bits), uint32(info.window_options_size), uint32(info.webview_settings_size)}
+		abiErr = checkABI(loadedABI, C.sizeof_WebViewWindowOptions, C.sizeof_WebViewSettings)
 	})
 	return abiErr
 }
